@@ -2,7 +2,7 @@ COMPOSE = docker compose --env-file .env -f deploy/compose.yaml
 
 FGA_CLI = openfga/cli:v0.8.2
 
-.PHONY: install format lint typecheck test model-test migrate up down
+.PHONY: install format lint typecheck test model-test migrate integration up down
 
 install:
 	pnpm install --frozen-lockfile
@@ -31,8 +31,12 @@ model-test:
 migrate:
 	pnpm --filter @riz/api migrate
 
+# Black-box API tests against the compose stack; needs `make up` first.
+integration:
+	RIZ_API_URL=http://localhost:8080 OPENFGA_API_URL=http://localhost:8081 pnpm --filter @riz/api test:integration
+
 up:
-	$(COMPOSE) up --build -d
+	$(COMPOSE) up --build -d --wait
 
 down:
 	$(COMPOSE) down
