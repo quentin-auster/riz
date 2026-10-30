@@ -54,8 +54,10 @@ services:
       NODE_ENV: development
       RIZ_AUTH_MODE: fixture
       RIZ_FIXTURE_AUTH_FILE: /etc/riz/auth.json
+      RIZ_FIXTURE_END_USERS_FILE: /etc/riz/end-users.json
     volumes:
       - ./fixtures/auth.json:/etc/riz/auth.json:ro
+      - ./fixtures/end-users.json:/etc/riz/end-users.json:ro
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

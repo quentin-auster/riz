@@ -6,6 +6,9 @@ export interface Principal {
   applications: readonly string[];
 }
 
+/** Resolves an end-user token to the verified end-user subject, or null if it is not valid. */
+export type EndUserVerifier = (token: string | undefined) => string | null;
+
 /** Resolves an `Authorization` header to a Principal, or null if it is not valid. */
 export type Authenticator = (
   authorization: string | undefined,

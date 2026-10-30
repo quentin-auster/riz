@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { authenticatorFromEnv } from "./index.js";
+import { authenticatorFromEnv, endUserVerifierFromEnv } from "./index.js";
 
 const SECRET = "s3cret-token";
 
@@ -41,6 +41,16 @@ test("resolves a fixture token to its principal and rejects others", () => {
   assert.equal(authenticate(`Bearer ${SECRET}`)?.subject, "anne");
   assert.equal(authenticate("Bearer other"), null);
   assert.equal(authenticate(undefined), null);
+});
+
+test("resolves a fixture end-user token to its subject and rejects others", () => {
+  const verify = endUserVerifierFromEnv({
+    RIZ_AUTH_MODE: "fixture",
+    RIZ_FIXTURE_END_USERS_FILE: fixtureFile(`{"${SECRET}": "alice"}`),
+  });
+  assert.equal(verify(SECRET), "alice");
+  assert.equal(verify("other"), null);
+  assert.equal(verify(undefined), null);
 });
 
 test("a malformed fixture file is rejected without echoing its contents", () => {

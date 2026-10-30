@@ -552,6 +552,11 @@ components:
         modelId:
           type: string
           description: Model that produced the decision. Absent when `indeterminate`.
+        code:
+          type: string
+          description: |
+            Present only when `status` is `indeterminate`: `timeout`,
+            `backend_error` or `no_active_model`. New values may be added.
     BatchCheckItem:
       type: object
       additionalProperties: false
