@@ -1,0 +1,19 @@
+name: base
+model_file: ./base.fga
+
+tuples:
+  - user: user:anne
+    relation: viewer
+    object: document:1
+
+tests:
+  - name: viewer relation
+    check:
+      - user: user:anne
+        object: document:1
+        assertions:
+          viewer: true
+      - user: user:bob
+        object: document:1
+        assertions:
+          viewer: false

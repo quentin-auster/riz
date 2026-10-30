@@ -1,0 +1,20 @@
+[project]
+name = "riz-workspace"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["riz", "pytest==8.4.2", "ruff==0.14.1", "mypy==1.18.2"]
+
+[tool.uv.workspace]
+members = ["sdks/python"]
+
+[tool.uv.sources]
+riz = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true

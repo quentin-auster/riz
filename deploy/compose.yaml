@@ -1,0 +1,64 @@
+name: riz
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set in .env}
+      OPENFGA_DB_PASSWORD: ${OPENFGA_DB_PASSWORD:?set in .env}
+      RIZ_DB_PASSWORD: ${RIZ_DB_PASSWORD:?set in .env}
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  openfga-migrate:
+    image: openfga/openfga:v1.10.2
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${OPENFGA_DB_PASSWORD}@postgres:5432/openfga?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  openfga:
+    image: openfga/openfga:v1.10.2
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${OPENFGA_DB_PASSWORD}@postgres:5432/openfga?sslmode=disable
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    environment:
+      PORT: "8080"
+      OPENFGA_API_URL: http://openfga:8080
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - openfga
+
+  console:
+    build:
+      context: ..
+      dockerfile: deploy/console.Dockerfile
+    environment:
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  pgdata:
