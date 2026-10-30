@@ -37,7 +37,8 @@ pnpm --filter @riz/scripts model validate models/openfga/base.fga
 pnpm --filter @riz/scripts model write models/openfga/base.fga --store-id <id> --api-url <url>
 ```
 
-`write` parses the model, runs its assertions with the pinned `fga` CLI image,
+Run these from anywhere in the repository; relative paths resolve against where
+you invoked `pnpm`. `write` parses the model, runs its assertions with the pinned `fga` CLI image,
 writes it to the store and prints the new model ID. It rejects a model that does
 not parse or whose assertions fail.
 

@@ -45,6 +45,14 @@ test("rejects a model whose assertions fail", () => {
   assert.throws(() => validateModel(file), /assertions failed/);
 });
 
+test("rejects a model when tests.yaml asserts a different model file", () => {
+  const file = modelDir(
+    VALID_MODEL,
+    tests(true).replace("./model.fga", "./other.fga"),
+  );
+  assert.throws(() => validateModel(file), /must set model_file/);
+});
+
 test("accepts a model whose assertions pass", () => {
   validateModel(modelDir(VALID_MODEL, tests(true)));
 });

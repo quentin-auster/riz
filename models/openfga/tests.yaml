@@ -75,6 +75,9 @@ tests:
       - user: user:pat
         object: document:d1
         assertions: { read: true, edit: true, delete: true, share: true }
+      - user: user:olga
+        object: document:d1
+        assertions: { read: true, edit: true, delete: true, share: true }
       - user: user:ed
         object: document:d1
         assertions: { read: true, edit: true, delete: false, share: false }
@@ -97,6 +100,9 @@ tests:
         object: document:d2
         assertions: { read: true, edit: false, delete: false, share: false }
       - user: user:pat
+        object: document:d2
+        assertions: { read: false, edit: false, delete: false, share: false }
+      - user: user:olga
         object: document:d2
         assertions: { read: false, edit: false, delete: false, share: false }
     list_objects:

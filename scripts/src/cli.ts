@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { validateModel, writeModel } from "./model.js";
 
@@ -9,12 +10,14 @@ const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: { "store-id": { type: "string" }, "api-url": { type: "string" } },
 });
-const [command, modelFile] = positionals;
+const [command, relativeFile] = positionals;
 
-if (!modelFile) {
+if (!relativeFile) {
   console.error(usage);
   process.exit(2);
 }
+// pnpm runs scripts from the package dir; INIT_CWD is where the user invoked it.
+const modelFile = resolve(process.env.INIT_CWD ?? process.cwd(), relativeFile);
 
 if (command === "validate") {
   validateModel(modelFile);

@@ -30,11 +30,13 @@ cannot reference objects in another, so inheritance never crosses stores.
 
 ### Cross-application roles: independently mapped application roles
 
-Each application store holds its own role tuples. An organization-wide role
-reaches an application only through an explicit, audited grant written into that
-application's store, for example granting `organization:acme#admin` the `admin`
-relation on the application. riz does not mirror, sync, or automatically inherit
-roles between stores.
+Each application store holds its own tuples. An organization-wide role reaches
+an application only through explicit, audited tuples written into that
+application's store: the organization's role tuples (for example
+`user:olga admin organization:acme`) and the parent link
+(`organization:acme organization application:crm`). The model then derives
+application roles from them (`admin from organization`). riz does not mirror,
+sync, or automatically inherit roles between stores.
 
 **Inheritance does not cross OpenFGA stores automatically.** Anything that looks
 like cross-store inheritance is an explicit tuple in the target store.

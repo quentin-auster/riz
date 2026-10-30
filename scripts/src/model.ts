@@ -21,6 +21,17 @@ export function validateModel(modelFile: string): ModelJson {
   const file = resolve(modelFile);
   const model = parse(file);
 
+  // The assertions must target the model we validate (and later write), not a sibling file.
+  const testsFile = `${dirname(file)}/tests.yaml`;
+  const target = readFileSync(testsFile, "utf8").match(
+    /^model_file:\s*(\S+)/m,
+  )?.[1];
+  if (!target || resolve(dirname(file), target) !== file) {
+    throw new Error(
+      `${testsFile} must set model_file to ${basename(file)}, got ${target}`,
+    );
+  }
+
   const result = spawnSync(
     "docker",
     [
@@ -68,5 +79,8 @@ export async function writeModel(
   });
   const { authorization_model_id } =
     await client.writeAuthorizationModel(model);
+  if (!authorization_model_id) {
+    throw new Error("OpenFGA did not return an authorization_model_id");
+  }
   return authorization_model_id;
 }
