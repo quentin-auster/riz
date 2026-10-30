@@ -188,6 +188,11 @@ test("rejects bad registrations", opts, () =>
       (await call("noScope", "POST", "/v1/applications", ok)).status,
       403,
     );
+    // A scoped allow-list must not probe or create IDs; it gets 403 whether or not the ID is taken.
+    assert.equal(
+      (await call("crmOnly", "POST", "/v1/applications", ok)).status,
+      403,
+    );
     // Request bodies must not accept store or model IDs.
     assert.equal(
       (await call("admin", "POST", "/v1/applications", { ...ok, storeId: "x" }))

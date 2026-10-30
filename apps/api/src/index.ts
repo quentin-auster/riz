@@ -19,7 +19,13 @@ function required(name: string): string {
 }
 
 const authenticate = authenticatorFromEnv(process.env);
-const pool = new pg.Pool({ connectionString: required("RIZ_DATABASE_URL") });
+const pool = new pg.Pool({
+  connectionString: required("RIZ_DATABASE_URL"),
+  // A saturated pool must fail a request, not hang it.
+  connectionTimeoutMillis: 5000,
+});
+// An idle-client error (e.g. Postgres restart) must not crash the process.
+pool.on("error", () => console.error(JSON.stringify({ msg: "pool error" })));
 
 const migrator = await pool.connect();
 try {

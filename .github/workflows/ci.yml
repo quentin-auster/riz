@@ -45,6 +45,7 @@ jobs:
       # .env.example holds placeholder dev values only.
       - run: cp .env.example .env
       - run: docker compose --env-file .env -f deploy/compose.yaml up -d --build --wait api
+      - run: curl -sf --retry 30 --retry-connrefused --retry-delay 1 http://localhost:8081/healthz
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:

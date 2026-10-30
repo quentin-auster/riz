@@ -36,6 +36,7 @@ const principals: Record<string, Principal> = {
 const endUsers: Record<string, string> = {
   "alice-token": "alice",
   "bob-token": "bob",
+  "userset-token": "alice#member",
 };
 const MAX_BATCH = 10;
 
@@ -205,6 +206,8 @@ test(
       assert.equal(bad.status, 401);
       assert.equal(bad.body.code, "invalid_end_user_token");
       assert.equal((await admin("noScope", read, "alice-token")).status, 403);
+      // A subject that would form an OpenFGA userset is refused, not passed through.
+      assert.equal((await admin("admin", read, "userset-token")).status, 401);
     }),
 );
 

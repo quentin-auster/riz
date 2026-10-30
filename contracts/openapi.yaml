@@ -20,7 +20,8 @@ info:
     application, for platform administrators). An unknown application and one the
     token is not allow-listed for are indistinguishable (`404 not_found`), so
     existence is not leaked. A missing scope is `403 forbidden`. Registering an
-    application needs only `applications:write`.
+    application needs `applications:write` and the `*` allow-list, since a
+    duplicate would otherwise reveal that an ID exists.
 
     **End users.** `endUserToken` is a JWT verified against the configured issuer
     and audience. The principal is `user:<sub>`. Checks without an end user

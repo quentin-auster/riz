@@ -74,6 +74,14 @@ export function adminRoutes(service: AdminService) {
     try {
       if (pathname === "/v1/applications" && req.method === "POST") {
         requireScope(principal, "applications:write");
+        // Registration can reveal whether an ID is taken, so it is for platform administrators.
+        if (!principal.applications.includes("*")) {
+          throw new HttpError(
+            403,
+            "forbidden",
+            "Registering applications requires an all-applications allow-list.",
+          );
+        }
         const input = createBody(await readJson(req));
         send(res, 201, await service.register(principal.subject, input));
       } else if (pathname === "/v1/applications" && req.method === "GET") {

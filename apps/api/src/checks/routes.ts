@@ -5,6 +5,7 @@ import { ApplicationNotFound } from "./resolver.js";
 import { type BatchItem, type CheckService, InvalidCheck } from "./service.js";
 
 const APPLICATION = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const SUBJECT = /^[A-Za-z0-9._@+-]{1,128}$/;
 const OBJECT = /^[a-z_]+:[^\s#]+$/;
 
 function invalid(message: string) {
@@ -125,7 +126,9 @@ export function checkRoutes(deps: {
     const endUser = deps.verifyEndUser(
       typeof header === "string" ? header : undefined,
     );
-    if (!endUser) {
+    // The subject is spliced into an OpenFGA `user:<sub>` string, so it must not
+    // be able to carry `#`, `*` or whitespace.
+    if (!endUser || !SUBJECT.test(endUser)) {
       throw new HttpError(
         401,
         "invalid_end_user_token",
