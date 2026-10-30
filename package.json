@@ -7,13 +7,14 @@
   },
   "scripts": {
     "format": "biome format --write .",
-    "lint": "biome check .",
+    "lint": "biome check . && redocly lint contracts/openapi.yaml",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build",
     "test": "pnpm -r test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.5",
+    "@redocly/cli": "2.72.1",
     "typescript": "5.9.3"
   }
 }

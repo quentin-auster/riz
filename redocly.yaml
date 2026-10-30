@@ -1,0 +1,7 @@
+extends:
+  - recommended-strict
+rules:
+  # Health endpoints take no input, so they have no client errors.
+  operation-4xx-response: off
+  # The only declared server is local development.
+  no-server-example.com: off

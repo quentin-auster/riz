@@ -1,0 +1,714 @@
+openapi: 3.1.0
+info:
+  title: riz API
+  version: 1.0.0
+  summary: Organization-wide authorization control plane.
+  description: |
+    Single source of truth for the riz HTTP API. SDKs and the API implementation
+    are written against this file.
+
+    **Identity and scoping are never taken from request bodies.**
+    - The calling workload is identified by its bearer token (`bearerAuth`).
+    - The end user is identified by a verified end-user token (`endUserToken`),
+      never by a user ID in a body or query.
+    - OpenFGA store IDs and authorization model IDs are resolved server-side per
+      application and environment; no request accepts them.
+
+    **Fail closed.** `indeterminate` is never an allow. Clients must treat it as
+    a deny.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: check
+    description: Permission checks.
+  - name: applications
+    description: Registered applications.
+  - name: relationships
+    description: Relationship tuples within one application's store.
+  - name: models
+    description: Authorization models bound to an application.
+  - name: audit
+    description: Audit events.
+  - name: health
+    description: Liveness and readiness.
+security:
+  - bearerAuth: []
+paths:
+  /v1/check:
+    post:
+      tags: [check]
+      operationId: check
+      summary: Check one permission
+      description: |
+        Evaluates whether the end user identified by `endUserToken` holds
+        `relation` on `object`. If authorization is unavailable the response is
+        `200` with `status: indeterminate`; it is never an allow.
+        Required scope: `check`.
+      security:
+        - bearerAuth: [check]
+          endUserToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckRequest"
+            examples:
+              read-document:
+                value:
+                  application: crm
+                  relation: read
+                  object: document:d1
+      responses:
+        "200":
+          description: Decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckResponse"
+              examples:
+                allow:
+                  value:
+                    status: allow
+                    requestId: req_01HZX3
+                    modelId: 01HZX3MODEL
+                deny:
+                  value:
+                    status: deny
+                    requestId: req_01HZX4
+                    modelId: 01HZX3MODEL
+                outage:
+                  summary: Authorization backend unavailable; treat as deny.
+                  value:
+                    status: indeterminate
+                    requestId: req_01HZX5
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /v1/batch-check:
+    post:
+      tags: [check]
+      operationId: batchCheck
+      summary: Check several permissions
+      description: |
+        At most 100 items. Every item is answered independently and correlated by
+        its `correlationId`; one item being `indeterminate` does not affect others.
+        Required scope: `check`.
+      security:
+        - bearerAuth: [check]
+          endUserToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchCheckRequest"
+            examples:
+              two-documents:
+                value:
+                  application: crm
+                  checks:
+                    - { correlationId: a, relation: read, object: "document:d1" }
+                    - { correlationId: b, relation: delete, object: "document:d1" }
+      responses:
+        "200":
+          description: Per-item decisions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCheckResponse"
+              examples:
+                mixed:
+                  value:
+                    requestId: req_01HZX6
+                    modelId: 01HZX3MODEL
+                    results:
+                      - { correlationId: a, status: allow }
+                      - { correlationId: b, status: deny }
+                outage:
+                  value:
+                    requestId: req_01HZX7
+                    results:
+                      - { correlationId: a, status: indeterminate }
+                      - { correlationId: b, status: indeterminate }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+  /v1/applications:
+    get:
+      tags: [applications]
+      operationId: listApplications
+      summary: List applications
+      description: "Required scope: `applications:read`."
+      security:
+        - bearerAuth: [applications:read]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of applications.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationList"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [applications]
+      operationId: createApplication
+      summary: Register an application
+      description: |
+        Provisions the application's isolated store and binds its model.
+        Required scope: `applications:write`.
+      security:
+        - bearerAuth: [applications:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationCreate"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /v1/applications/{id}:
+    get:
+      tags: [applications]
+      operationId: getApplication
+      summary: Get an application
+      description: "Required scope: `applications:read`."
+      security:
+        - bearerAuth: [applications:read]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ApplicationId"
+      responses:
+        "200":
+          description: The application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/relationships:
+    get:
+      tags: [relationships]
+      operationId: listRelationships
+      summary: List relationship tuples
+      description: |
+        Returns tuples for one application only. Required scope: `relationships:read`.
+      security:
+        - bearerAuth: [relationships:read]
+      parameters:
+        - $ref: "#/components/parameters/Application"
+        - name: object
+          in: query
+          description: Filter by object, `type:id` or `type:`.
+          schema:
+            type: string
+        - name: relation
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of tuples.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RelationshipList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [relationships]
+      operationId: writeRelationships
+      summary: Write relationship tuples
+      description: |
+        Permission mutation: authorized and audited. At most 100 tuples.
+        Required scope: `relationships:write`.
+      security:
+        - bearerAuth: [relationships:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RelationshipWrite"
+      responses:
+        "204":
+          description: Written.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [relationships]
+      operationId: deleteRelationship
+      summary: Delete one relationship tuple
+      description: |
+        Permission mutation: authorized and audited.
+        Required scope: `relationships:write`.
+      security:
+        - bearerAuth: [relationships:write]
+      parameters:
+        - $ref: "#/components/parameters/Application"
+        - name: subject
+          in: query
+          required: true
+          description: Tuple subject, for example `user:anne` or `team:eng#member`.
+          schema:
+            type: string
+        - name: relation
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: object
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v1/models:
+    get:
+      tags: [models]
+      operationId: listModels
+      summary: List an application's authorization models
+      description: "Required scope: `models:read`."
+      security:
+        - bearerAuth: [models:read]
+      parameters:
+        - $ref: "#/components/parameters/Application"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of models.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /v1/audit:
+    get:
+      tags: [audit]
+      operationId: listAuditEvents
+      summary: List audit events
+      description: "Required scope: `audit:read`."
+      security:
+        - bearerAuth: [audit:read]
+      parameters:
+        - name: application
+          in: query
+          schema:
+            $ref: "#/components/schemas/ApplicationId"
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: A page of audit events, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditList"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /health/live:
+    get:
+      tags: [health]
+      operationId: healthLive
+      summary: Liveness
+      description: The process is running. No authentication.
+      security: []
+      responses:
+        "200":
+          description: Alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          $ref: "#/components/responses/Error"
+  /health/ready:
+    get:
+      tags: [health]
+      operationId: healthReady
+      summary: Readiness
+      description: |
+        The API can reach its database and OpenFGA. No authentication.
+        Not ready returns 503.
+      security: []
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Workload credential. Scopes: `check`, `applications:read`,
+        `applications:write`, `relationships:read`, `relationships:write`,
+        `models:read`, `audit:read`. Check scopes are separate from administrative
+        mutation scopes.
+    endUserToken:
+      type: apiKey
+      in: header
+      name: Riz-End-User-Token
+      description: |
+        Verified token of the end user a check is made for. The API validates it
+        and derives the principal; an unverifiable token is rejected, never
+        replaced by a service identity.
+  parameters:
+    Application:
+      name: application
+      in: query
+      required: true
+      schema:
+        $ref: "#/components/schemas/ApplicationId"
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from a previous page's `nextCursor`.
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+  responses:
+    Error:
+      description: Error. The `code` is stable and machine-readable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            forbidden:
+              value:
+                code: forbidden
+                message: Caller is not permitted for this application.
+                requestId: req_01HZX8
+  schemas:
+    ApplicationId:
+      type: string
+      pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+      examples: [crm]
+    ObjectRef:
+      type: string
+      description: OpenFGA object, `type:id`.
+      pattern: "^[a-z_]+:[^\\s#]+$"
+      examples: ["document:d1"]
+    Decision:
+      type: string
+      enum: [allow, deny, indeterminate]
+      description: "`indeterminate` means a decision could not be made and is never an allow."
+    CheckRequest:
+      type: object
+      additionalProperties: false
+      required: [application, relation, object]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        relation:
+          type: string
+          examples: [read]
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+    CheckResponse:
+      type: object
+      required: [status, requestId]
+      properties:
+        status:
+          $ref: "#/components/schemas/Decision"
+        requestId:
+          type: string
+        modelId:
+          type: string
+          description: Model that produced the decision. Absent when `indeterminate`.
+    BatchCheckItem:
+      type: object
+      additionalProperties: false
+      required: [correlationId, relation, object]
+      properties:
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Caller-chosen, unique within the batch.
+        relation:
+          type: string
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+    BatchCheckRequest:
+      type: object
+      additionalProperties: false
+      required: [application, checks]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        checks:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/BatchCheckItem"
+    BatchCheckResult:
+      type: object
+      required: [correlationId, status]
+      properties:
+        correlationId:
+          type: string
+        status:
+          $ref: "#/components/schemas/Decision"
+    BatchCheckResponse:
+      type: object
+      required: [requestId, results]
+      properties:
+        requestId:
+          type: string
+        modelId:
+          type: string
+          description: Absent when no item could be decided.
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/BatchCheckResult"
+    ApplicationCreate:
+      type: object
+      additionalProperties: false
+      required: [name, environment]
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
+        environment:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+          examples: [prod]
+    Application:
+      type: object
+      required: [id, name, environment, createdAt]
+      properties:
+        id:
+          $ref: "#/components/schemas/ApplicationId"
+        name:
+          type: string
+        environment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ApplicationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Application"
+        nextCursor:
+          type: string
+    Relationship:
+      type: object
+      additionalProperties: false
+      required: [subject, relation, object]
+      properties:
+        subject:
+          type: string
+          description: Tuple subject, for example `user:anne` or `team:eng#member`.
+        relation:
+          type: string
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+    RelationshipWrite:
+      type: object
+      additionalProperties: false
+      required: [application, relationships]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        relationships:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/Relationship"
+    RelationshipList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Relationship"
+        nextCursor:
+          type: string
+    Model:
+      type: object
+      required: [id, createdAt, active]
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+          description: Whether this model is the one the application is bound to.
+    ModelList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+        nextCursor:
+          type: string
+    AuditEvent:
+      type: object
+      required: [id, time, actor, action, outcome]
+      properties:
+        id:
+          type: string
+        time:
+          type: string
+          format: date-time
+        actor:
+          type: string
+          description: Verified identity that performed the action.
+        action:
+          type: string
+          examples: [relationships.write]
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        outcome:
+          type: string
+          enum: [success, denied, error]
+        requestId:
+          type: string
+    AuditList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        nextCursor:
+          type: string
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    Error:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthenticated
+            - forbidden
+            - not_found
+            - conflict
+            - rate_limited
+            - unavailable
+            - internal
+        message:
+          type: string
+          description: Human-readable; never contains tokens or protected data.
+        requestId:
+          type: string
