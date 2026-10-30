@@ -1,13 +1,30 @@
-import { createServer, type Server } from "node:http";
+import { randomUUID } from "node:crypto";
+import { createServer, type Server, type ServerResponse } from "node:http";
+import type { Authenticator } from "./auth/index.js";
 
-export function createApp(): Server {
+function send(res: ServerResponse, status: number, body: unknown) {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(body));
+}
+
+export function createApp(opts: { authenticate: Authenticator }): Server {
   return createServer((req, res) => {
     if (req.method === "GET" && req.url === "/health/live") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
+      send(res, 200, { status: "ok" });
       return;
     }
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(JSON.stringify({ code: "not_found" }));
+    // Everything else, including routes that do not exist yet, requires authentication.
+    if (req.url?.startsWith("/v1/")) {
+      const principal = opts.authenticate(req.headers.authorization);
+      if (!principal) {
+        send(res, 401, {
+          code: "unauthenticated",
+          message: "Missing or invalid bearer token.",
+          requestId: `req_${randomUUID()}`,
+        });
+        return;
+      }
+    }
+    send(res, 404, { code: "not_found" });
   });
 }

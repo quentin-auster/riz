@@ -49,6 +49,12 @@ services:
     environment:
       PORT: "8080"
       OPENFGA_API_URL: http://openfga:8080
+      # Local development only: the image defaults to production, which refuses fixture auth.
+      NODE_ENV: development
+      RIZ_AUTH_MODE: fixture
+      RIZ_FIXTURE_AUTH_FILE: /etc/riz/auth.json
+    volumes:
+      - ./fixtures/auth.json:/etc/riz/auth.json:ro
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
