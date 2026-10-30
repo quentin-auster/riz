@@ -1,7 +1,6 @@
-import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EndUserVerifier, Principal } from "../auth/index.js";
-import { HttpError, readJson, send } from "../http.js";
+import { HttpError, readJson, requestIdOf, send } from "../http.js";
 import { ApplicationNotFound } from "./resolver.js";
 import { type BatchItem, type CheckService, InvalidCheck } from "./service.js";
 
@@ -155,7 +154,7 @@ export function checkRoutes(deps: {
         permit(input.application);
         result = await deps.service.check(input.application, endUser, input);
       }
-      send(res, 200, { ...result, requestId: `req_${randomUUID()}` });
+      send(res, 200, { ...result, requestId: requestIdOf(res) });
     } catch (err) {
       if (err instanceof ApplicationNotFound) {
         throw new HttpError(404, "not_found", "Application not found.");

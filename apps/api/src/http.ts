@@ -16,11 +16,25 @@ export function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+const REQUEST_ID = /^[A-Za-z0-9._-]{1,64}$/;
+
+/** Reuses a well-formed caller-supplied ID, otherwise mints one. */
+export function newRequestId(supplied: string | undefined): string {
+  return supplied && REQUEST_ID.test(supplied)
+    ? supplied
+    : `req_${randomUUID()}`;
+}
+
+/** The ID `createApp` assigned to this request; also sent as `X-Request-Id`. */
+export function requestIdOf(res: ServerResponse): string {
+  return String(res.getHeader("x-request-id"));
+}
+
 export function sendError(res: ServerResponse, err: HttpError) {
   send(res, err.status, {
     code: err.code,
     message: err.message,
-    requestId: `req_${randomUUID()}`,
+    requestId: requestIdOf(res),
   });
 }
 

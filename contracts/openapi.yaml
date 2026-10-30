@@ -36,6 +36,10 @@ info:
     non-200 response, timeout, or unrecognized `status` or error `code` as a
     deny. Authorization outage on a check is `200` with `indeterminate`; `503`
     is returned only when the API itself cannot answer.
+
+    **Request IDs.** Every response carries `X-Request-Id`, equal to the
+    `requestId` in its body. A well-formed caller-supplied `X-Request-Id`
+    (1 to 64 characters of `A-Z a-z 0-9 . _ -`) is reused; otherwise one is generated.
   license:
     name: Apache-2.0
     identifier: Apache-2.0

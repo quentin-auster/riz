@@ -53,6 +53,8 @@ async function withApp(
     options: `-c search_path=${schema}`,
   });
   const server = createApp({
+    readiness: async () => [],
+    log: () => {},
     authenticate: (h) => principals[h?.replace("Bearer ", "") ?? ""] ?? null,
     routes: adminRoutes(
       createAdminService({

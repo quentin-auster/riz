@@ -9,6 +9,7 @@ import { createResolver, dbLookup } from "./checks/resolver.js";
 import { checkRoutes } from "./checks/routes.js";
 import { createCheckService } from "./checks/service.js";
 import { migrate } from "./db/migrate.js";
+import { readiness } from "./health.js";
 import { createApp } from "./server.js";
 
 function required(name: string): string {
@@ -57,10 +58,19 @@ const checks = checkRoutes({
   verifyEndUser: endUserVerifierFromEnv(process.env),
 });
 const adminHandler = adminRoutes(admin);
+const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
+if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
+  throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
+}
 
 const port = Number(process.env.PORT ?? 8080);
 createApp({
   authenticate,
+  readiness: readiness({
+    pool,
+    openfgaUrl: required("OPENFGA_API_URL"),
+    timeoutMs: readyTimeoutMs,
+  }),
   routes: async (req, res, principal, url) =>
     (await adminHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),

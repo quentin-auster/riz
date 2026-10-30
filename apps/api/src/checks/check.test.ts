@@ -93,6 +93,8 @@ async function withApp(
       }),
     );
     const server = createApp({
+      readiness: async () => [],
+      log: () => {},
       authenticate: (h) => principals[h?.replace("Bearer ", "") ?? ""] ?? null,
       routes: async (req, res, p, u) =>
         (await admin(req, res, p, u)) || check(req, res, p, u),
