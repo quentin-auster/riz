@@ -34,7 +34,7 @@ services:
       OPENFGA_DATASTORE_ENGINE: postgres
       OPENFGA_DATASTORE_URI: postgres://openfga:${OPENFGA_DB_PASSWORD}@postgres:5432/openfga?sslmode=disable
     ports:
-      - "8081:8080"
+      - "127.0.0.1:8081:8080"
     depends_on:
       openfga-migrate:
         condition: service_completed_successfully
@@ -47,7 +47,7 @@ services:
       PORT: "8080"
       OPENFGA_API_URL: http://openfga:8080
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - openfga
 
@@ -58,7 +58,7 @@ services:
     environment:
       PORT: "3000"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
 volumes:
   pgdata:
