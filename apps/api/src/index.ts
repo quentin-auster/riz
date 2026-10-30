@@ -43,7 +43,13 @@ const checkTimeoutMs = Number(process.env.RIZ_CHECK_TIMEOUT_MS ?? 2000);
 if (!Number.isInteger(checkTimeoutMs) || checkTimeoutMs < 1) {
   throw new Error("RIZ_CHECK_TIMEOUT_MS must be a positive integer");
 }
+// The contract caps a batch at 100; operators may only lower it.
+const maxBatchSize = Number(process.env.RIZ_BATCH_MAX ?? 100);
+if (!Number.isInteger(maxBatchSize) || maxBatchSize < 1 || maxBatchSize > 100) {
+  throw new Error("RIZ_BATCH_MAX must be an integer from 1 to 100");
+}
 const checks = checkRoutes({
+  maxBatchSize,
   service: createCheckService({
     resolver: createResolver(dbLookup(pool), required("OPENFGA_API_URL")),
     timeoutMs: checkTimeoutMs,

@@ -33,13 +33,18 @@ const principals: Record<string, Principal> = {
   crmOnly: { subject: "crm", scopes: ["check"], applications: ["crm-prod"] },
   noScope: { subject: "ns", scopes: [], applications: ["*"] },
 };
-const endUsers: Record<string, string> = { "alice-token": "alice" };
+const endUsers: Record<string, string> = {
+  "alice-token": "alice",
+  "bob-token": "bob",
+};
+const MAX_BATCH = 10;
 
 type Res = { status: number; body: Record<string, unknown> };
 type Call = (
   token: string,
   body: unknown,
   endUserToken?: string,
+  path?: string,
 ) => Promise<Res>;
 
 function listen(server: Server) {
@@ -73,6 +78,7 @@ async function withApp(
         timeoutMs,
       }),
       verifyEndUser: (t) => (t && endUsers[t]) || null,
+      maxBatchSize: MAX_BATCH,
     });
     const admin = adminRoutes(
       createAdminService({
@@ -93,8 +99,8 @@ async function withApp(
     });
     servers.push(server);
     const port = await listen(server);
-    return async (token, body, endUserToken) => {
-      const res = await fetch(`http://127.0.0.1:${port}/v1/check`, {
+    return async (token, body, endUserToken, path = "/v1/check") => {
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${token}`,
@@ -256,4 +262,254 @@ test("is indeterminate within the timeout when OpenFGA hangs", opts, () =>
       hang.close();
     }
   }),
+);
+
+const BATCH = "/v1/batch-check";
+const item = (correlationId: string, relation: string, object: string) => ({
+  correlationId,
+  relation,
+  object,
+});
+
+/** A fake OpenFGA whose batch-check answers come from `answer`, keyed by correlation ID. */
+async function stubBatchUpstream(
+  answer: (ids: string[]) => Record<string, unknown>,
+) {
+  const server = createServer(async (req, res) => {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const ids = (
+      JSON.parse(raw) as { checks: { correlation_id: string }[] }
+    ).checks.map((c) => c.correlation_id);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ result: answer(ids) }));
+  });
+  const port = await listen(server);
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+}
+
+test(
+  "batch results equal the individual check results for the same inputs",
+  opts,
+  () =>
+    withApp(async ({ admin }) => {
+      const grid = ["read", "edit", "delete", "share"].flatMap((rel) =>
+        ["document:d1", "document:other"].map((obj) => [rel, obj] as const),
+      );
+      grid.push(["viewer", "project:p1"], ["editor", "project:p1"]);
+      for (const token of ["alice-token", "bob-token"]) {
+        const checks = grid.map(([rel, obj], i) => item(`c${i}`, rel, obj));
+        const batch = await admin(
+          "admin",
+          { application: "crm-prod", checks },
+          token,
+          BATCH,
+        );
+        assert.equal(batch.status, 200);
+        const results = batch.body.results as {
+          correlationId: string;
+          status: string;
+        }[];
+        assert.equal(results.length, grid.length);
+        for (const [i, [rel, obj]] of grid.entries()) {
+          const single = await admin(
+            "admin",
+            { application: "crm-prod", relation: rel, object: obj },
+            token,
+          );
+          assert.equal(results[i]?.correlationId, `c${i}`);
+          assert.equal(
+            results[i]?.status,
+            single.body.status,
+            `${token} ${rel} ${obj}`,
+          );
+        }
+      }
+      // The grid must contain both outcomes, or equality proves little.
+      const alice = await admin(
+        "admin",
+        { application: "crm-prod", checks: [item("x", "read", "document:d1")] },
+        "alice-token",
+        BATCH,
+      );
+      assert.deepEqual(alice.body.results, [
+        { correlationId: "x", status: "allow" },
+      ]);
+    }),
+);
+
+test(
+  "maps batch answers by correlation ID even when upstream order is shuffled",
+  opts,
+  () =>
+    withApp(async ({ callWith }) => {
+      // Upstream answers in reverse order; the answer is encoded in the ID.
+      const upstream = await stubBatchUpstream((ids) =>
+        Object.fromEntries(
+          [...ids]
+            .reverse()
+            .map((id) => [id, { allowed: id.includes("allow") }]),
+        ),
+      );
+      try {
+        const call = await callWith(upstream.url, 2000);
+        const res = await call(
+          "admin",
+          {
+            application: "crm-prod",
+            checks: ["a-deny", "b-allow", "c-deny", "d-allow"].map((id) =>
+              item(id, "read", "document:d1"),
+            ),
+          },
+          "alice-token",
+          BATCH,
+        );
+        assert.deepEqual(res.body.results, [
+          { correlationId: "a-deny", status: "deny" },
+          { correlationId: "b-allow", status: "allow" },
+          { correlationId: "c-deny", status: "deny" },
+          { correlationId: "d-allow", status: "allow" },
+        ]);
+      } finally {
+        upstream.close();
+      }
+    }),
+);
+
+test(
+  "a failed or missing batch item is indeterminate without affecting the others",
+  opts,
+  () =>
+    withApp(async ({ callWith }) => {
+      const upstream = await stubBatchUpstream((ids) => ({
+        [ids[0] as string]: { allowed: true },
+        [ids[1] as string]: {
+          error: { internal_error: "internal_error", message: "x" },
+        },
+        // ids[2] is never answered.
+      }));
+      try {
+        const call = await callWith(upstream.url, 2000);
+        const res = await call(
+          "admin",
+          {
+            application: "crm-prod",
+            checks: ["a", "b", "c"].map((id) =>
+              item(id, "read", "document:d1"),
+            ),
+          },
+          "alice-token",
+          BATCH,
+        );
+        assert.deepEqual(res.body.results, [
+          { correlationId: "a", status: "allow" },
+          { correlationId: "b", status: "indeterminate" },
+          { correlationId: "c", status: "indeterminate" },
+        ]);
+      } finally {
+        upstream.close();
+      }
+    }),
+);
+
+test(
+  "a batch is all indeterminate, never allow, when OpenFGA is unreachable",
+  opts,
+  () =>
+    withApp(async ({ callWith }) => {
+      const call = await callWith("http://127.0.0.1:1", 2000);
+      const res = await call(
+        "admin",
+        {
+          application: "crm-prod",
+          checks: [
+            item("a", "read", "document:d1"),
+            item("b", "edit", "document:d1"),
+          ],
+        },
+        "alice-token",
+        BATCH,
+      );
+      assert.equal(res.status, 200);
+      assert.deepEqual(res.body.results, [
+        { correlationId: "a", status: "indeterminate" },
+        { correlationId: "b", status: "indeterminate" },
+      ]);
+      assert.equal("modelId" in res.body, false);
+    }),
+);
+
+test(
+  "rejects an over-limit batch, duplicate correlation IDs and a foreign application",
+  opts,
+  () =>
+    withApp(async ({ admin }) => {
+      const many = Array.from({ length: MAX_BATCH + 1 }, (_, i) =>
+        item(`c${i}`, "read", "document:d1"),
+      );
+      const tooBig = await admin(
+        "admin",
+        { application: "crm-prod", checks: many },
+        "alice-token",
+        BATCH,
+      );
+      assert.equal(tooBig.status, 400);
+      assert.equal(tooBig.body.code, "batch_too_large");
+
+      const dup = await admin(
+        "admin",
+        {
+          application: "crm-prod",
+          checks: [
+            item("a", "read", "document:d1"),
+            item("a", "edit", "document:d1"),
+          ],
+        },
+        "alice-token",
+        BATCH,
+      );
+      assert.equal(dup.status, 400);
+      assert.equal(dup.body.code, "duplicate_correlation_id");
+
+      const one = { checks: [item("a", "read", "document:d1")] };
+      assert.equal(
+        (
+          await admin(
+            "crmOnly",
+            { application: "hr-prod", ...one },
+            "alice-token",
+            BATCH,
+          )
+        ).status,
+        404,
+      );
+      assert.equal(
+        (
+          await admin(
+            "noScope",
+            { application: "crm-prod", ...one },
+            "alice-token",
+            BATCH,
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await admin(
+            "admin",
+            { application: "crm-prod", ...one },
+            undefined,
+            BATCH,
+          )
+        ).status,
+        401,
+      );
+    }),
 );
