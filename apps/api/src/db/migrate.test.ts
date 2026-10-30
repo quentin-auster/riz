@@ -69,6 +69,21 @@ test("allows only one active model binding per application", opts, () =>
   }),
 );
 
+test(
+  "rejects a hyphenated environment that would make ids ambiguous",
+  opts,
+  () =>
+    withSchema(async (client) => {
+      await migrate(client);
+      await assert.rejects(
+        client.query(
+          "INSERT INTO applications (id, name, environment, store_id) VALUES ('a-b-c', 'a', 'b-c', 's1')",
+        ),
+        /check constraint/,
+      );
+    }),
+);
+
 test("rejects an application id that is not name-environment", opts, () =>
   withSchema(async (client) => {
     await migrate(client);

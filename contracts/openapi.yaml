@@ -599,7 +599,8 @@ components:
           pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
         environment:
           type: string
-          pattern: "^[a-z0-9][a-z0-9-]{0,30}$"
+          pattern: "^[a-z0-9]{1,31}$"
+          description: Lowercase letters and digits only, so the application `id` is unambiguous.
           examples: [prod]
     Application:
       type: object

@@ -3,7 +3,8 @@
 CREATE TABLE applications (
   id          text PRIMARY KEY,
   name        text NOT NULL CHECK (name ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
-  environment text NOT NULL CHECK (environment ~ '^[a-z0-9][a-z0-9-]{0,30}$'),
+  -- No hyphen, so id (name-environment) maps back to exactly one pair.
+  environment text NOT NULL CHECK (environment ~ '^[a-z0-9]{1,31}$'),
   -- Resolved server-side per application and environment; never taken from a request.
   store_id    text NOT NULL UNIQUE,
   created_at  timestamptz NOT NULL DEFAULT now(),
@@ -28,7 +29,7 @@ CREATE TABLE provider_configs (
   id             bigserial PRIMARY KEY,
   application_id text NOT NULL REFERENCES applications (id),
   provider       text NOT NULL,
-  config         jsonb NOT NULL DEFAULT '{}',
+  config         jsonb NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(config) = 'object'),
   created_at     timestamptz NOT NULL DEFAULT now(),
   UNIQUE (application_id, provider)
 );

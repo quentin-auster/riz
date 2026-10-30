@@ -35,6 +35,8 @@ export async function migrate(client: Client): Promise<string[]> {
       if (done.has(file)) continue;
       await client.query("BEGIN");
       try {
+        // Fail fast rather than queue behind a long query and block all traffic.
+        await client.query("SET LOCAL lock_timeout = '5s'");
         await client.query(readFileSync(join(MIGRATIONS_DIR, file), "utf8"));
         await client.query(
           "INSERT INTO schema_migrations (version) VALUES ($1)",
