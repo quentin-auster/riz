@@ -16,10 +16,11 @@ info:
 
     **Applications.** An application's `id` is server-assigned as
     `<name>-<environment>` and is the only application reference in requests. The
-    bearer token carries an allow-list of application IDs; an unknown application
-    and an application the token is not allow-listed for are indistinguishable
-    (`403 forbidden`), so existence is not leaked. Scopes apply only within that
-    allow-list.
+    bearer token carries an allow-list of application IDs (`*` covers every
+    application, for platform administrators). An unknown application and one the
+    token is not allow-listed for are indistinguishable (`404 not_found`), so
+    existence is not leaked. A missing scope is `403 forbidden`. Registering an
+    application needs only `applications:write`.
 
     **End users.** `endUserToken` is a JWT verified against the configured issuer
     and audience. The principal is `user:<sub>`. Checks without an end user
@@ -113,6 +114,8 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
   /v1/batch-check:
@@ -169,6 +172,8 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "429":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
@@ -250,6 +255,8 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/relationships:
     get:
       tags: [relationships]
@@ -285,6 +292,8 @@ paths:
           $ref: "#/components/responses/Error"
         "403":
           $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
     post:
       tags: [relationships]
       operationId: writeRelationships
@@ -308,6 +317,8 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
@@ -374,6 +385,8 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
   /v1/audit:
     get:

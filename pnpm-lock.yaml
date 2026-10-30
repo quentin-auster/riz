@@ -20,6 +20,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@openfga/sdk':
+        specifier: 0.9.7
+        version: 0.9.7
+      '@openfga/syntax-transformer':
+        specifier: 0.2.2
+        version: 0.2.2
       pg:
         specifier: 8.23.1
         version: 8.23.1

@@ -21,8 +21,12 @@ jobs:
           --health-retries 30
     env:
       RIZ_DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
+      OPENFGA_API_URL: http://localhost:8081
     steps:
       - uses: actions/checkout@v5
+      # In-memory datastore: enough for API integration tests, nothing persists.
+      - run: docker run -d -p 8081:8080 openfga/openfga:v1.10.2 run
+      - run: curl -sf --retry 30 --retry-connrefused --retry-delay 1 http://localhost:8081/healthz
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:

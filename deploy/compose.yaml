@@ -49,6 +49,7 @@ services:
     environment:
       PORT: "8080"
       OPENFGA_API_URL: http://openfga:8080
+      RIZ_DATABASE_URL: postgres://riz:${RIZ_DB_PASSWORD:?set in .env}@postgres:5432/riz
       # Local development only: the image defaults to production, which refuses fixture auth.
       NODE_ENV: development
       RIZ_AUTH_MODE: fixture
@@ -58,7 +59,10 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
-      - openfga
+      postgres:
+        condition: service_healthy
+      openfga:
+        condition: service_started
 
   console:
     build:

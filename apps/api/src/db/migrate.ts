@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Client } from "pg";
+import type { ClientBase } from "pg";
 
 const MIGRATIONS_DIR = join(import.meta.dirname, "../../migrations");
 // Arbitrary constant: serializes concurrent runners (for example several replicas starting).
@@ -11,7 +11,7 @@ const LOCK_ID = 7_201_001;
  * transaction, and returns the versions it applied. Re-running is a no-op.
  * Applied migrations are never edited; changes go in a new file.
  */
-export async function migrate(client: Client): Promise<string[]> {
+export async function migrate(client: ClientBase): Promise<string[]> {
   await client.query("SELECT pg_advisory_lock($1)", [LOCK_ID]);
   try {
     await client.query(

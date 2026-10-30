@@ -1,30 +1,53 @@
-import { randomUUID } from "node:crypto";
-import { createServer, type Server, type ServerResponse } from "node:http";
-import type { Authenticator } from "./auth/index.js";
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
+import type { Authenticator, Principal } from "./auth/index.js";
+import { HttpError, send, sendError } from "./http.js";
 
-function send(res: ServerResponse, status: number, body: unknown) {
-  res.writeHead(status, { "content-type": "application/json" });
-  res.end(JSON.stringify(body));
-}
+type Routes = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  principal: Principal,
+  url: URL,
+) => Promise<boolean>;
 
-export function createApp(opts: { authenticate: Authenticator }): Server {
-  return createServer((req, res) => {
-    if (req.method === "GET" && req.url === "/health/live") {
+export function createApp(opts: {
+  authenticate: Authenticator;
+  routes: Routes;
+}): Server {
+  async function handle(req: IncomingMessage, res: ServerResponse) {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    if (req.method === "GET" && url.pathname === "/health/live") {
       send(res, 200, { status: "ok" });
       return;
     }
     // Everything else, including routes that do not exist yet, requires authentication.
-    if (req.url?.startsWith("/v1/")) {
+    if (url.pathname.startsWith("/v1/")) {
       const principal = opts.authenticate(req.headers.authorization);
       if (!principal) {
-        send(res, 401, {
-          code: "unauthenticated",
-          message: "Missing or invalid bearer token.",
-          requestId: `req_${randomUUID()}`,
-        });
-        return;
+        throw new HttpError(
+          401,
+          "unauthenticated",
+          "Missing or invalid bearer token.",
+        );
       }
+      if (await opts.routes(req, res, principal, url)) return;
     }
-    send(res, 404, { code: "not_found" });
+    throw new HttpError(404, "not_found", "Not found.");
+  }
+
+  return createServer((req, res) => {
+    handle(req, res).catch((err) => {
+      if (res.headersSent) return;
+      if (err instanceof HttpError) return sendError(res, err);
+      // Fail closed without leaking internals; log the error type only.
+      console.error(
+        JSON.stringify({ msg: "unhandled error", error: String(err?.name) }),
+      );
+      sendError(res, new HttpError(500, "internal", "Internal error."));
+    });
   });
 }

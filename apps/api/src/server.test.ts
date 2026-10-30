@@ -9,7 +9,7 @@ const authenticate = (authorization: string | undefined) =>
   authorization === "Bearer good" ? anne : null;
 
 async function get(path: string, authorization?: string): Promise<Response> {
-  const server = createApp({ authenticate });
+  const server = createApp({ authenticate, routes: async () => false });
   await new Promise<void>((resolve) => server.listen(0, resolve));
   try {
     const { port } = server.address() as AddressInfo;
