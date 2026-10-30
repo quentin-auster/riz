@@ -14,8 +14,27 @@ info:
     - OpenFGA store IDs and authorization model IDs are resolved server-side per
       application and environment; no request accepts them.
 
-    **Fail closed.** `indeterminate` is never an allow. Clients must treat it as
-    a deny.
+    **Applications.** An application's `id` is server-assigned as
+    `<name>-<environment>` and is the only application reference in requests. The
+    bearer token carries an allow-list of application IDs; an unknown application
+    and an application the token is not allow-listed for are indistinguishable
+    (`403 forbidden`), so existence is not leaked. Scopes apply only within that
+    allow-list.
+
+    **End users.** `endUserToken` is a JWT verified against the configured issuer
+    and audience. The principal is `user:<sub>`. Checks without an end user
+    (service principals) are not supported. An invalid or expired end-user token
+    is `401 invalid_end_user_token`, distinct from a bad bearer token.
+
+    **Actors.** Mutations are authorized by scope plus the application allow-list
+    and audited with the bearer token's subject as actor. Human administrators
+    (the console) use bearer tokens issued for their own identity.
+    `Relationship.subject` is tuple data, not the caller's identity.
+
+    **Fail closed.** `indeterminate` is never an allow. Clients must treat any
+    non-200 response, timeout, or unrecognized `status` or error `code` as a
+    deny. Authorization outage on a check is `200` with `indeterminate`; `503`
+    is returned only when the API itself cannot answer.
   license:
     name: Apache-2.0
     identifier: Apache-2.0
@@ -94,15 +113,18 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /v1/batch-check:
     post:
       tags: [check]
       operationId: batchCheck
       summary: Check several permissions
       description: |
-        At most 100 items. Every item is answered independently and correlated by
-        its `correlationId`; one item being `indeterminate` does not affect others.
-        Required scope: `check`.
+        At most 100 items (`400 batch_too_large` above that). `correlationId`s
+        must be unique within the batch (`400 duplicate_correlation_id`; the whole
+        batch is rejected). The response has exactly one result per item. One item
+        being `indeterminate` does not affect others. Required scope: `check`.
       security:
         - bearerAuth: [check]
           endUserToken: []
@@ -148,6 +170,8 @@ paths:
           $ref: "#/components/responses/Error"
         "429":
           $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /v1/applications:
     get:
       tags: [applications]
@@ -175,7 +199,8 @@ paths:
       operationId: createApplication
       summary: Register an application
       description: |
-        Provisions the application's isolated store and binds its model.
+        Provisions the application's isolated store and binds its model. The
+        resulting `id` is `<name>-<environment>`; a duplicate is `409 conflict`.
         Required scope: `applications:write`.
       security:
         - bearerAuth: [applications:write]
@@ -224,8 +249,6 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
-          $ref: "#/components/responses/Error"
-        "404":
           $ref: "#/components/responses/Error"
   /v1/relationships:
     get:
@@ -293,7 +316,8 @@ paths:
       operationId: deleteRelationship
       summary: Delete one relationship tuple
       description: |
-        Permission mutation: authorized and audited.
+        Permission mutation: authorized and audited. Deleting a tuple that does
+        not exist is `404 not_found` (not idempotent, so mistakes are visible).
         Required scope: `relationships:write`.
       security:
         - bearerAuth: [relationships:write]
@@ -439,9 +463,9 @@ components:
       in: header
       name: Riz-End-User-Token
       description: |
-        Verified token of the end user a check is made for. The API validates it
-        and derives the principal; an unverifiable token is rejected, never
-        replaced by a service identity.
+        JWT of the end user a check is made for. The API verifies it and derives
+        the principal `user:<sub>`; an unverifiable token is rejected
+        (`invalid_end_user_token`), never replaced by a service identity.
   parameters:
     Application:
       name: application
@@ -489,7 +513,9 @@ components:
     Decision:
       type: string
       enum: [allow, deny, indeterminate]
-      description: "`indeterminate` means a decision could not be made and is never an allow."
+      description: |
+        `indeterminate` means a decision could not be made and is never an allow.
+        New values may be added; clients treat any unrecognized value as a deny.
     CheckRequest:
       type: object
       additionalProperties: false
@@ -559,6 +585,8 @@ components:
           description: Absent when no item could be decided.
         results:
           type: array
+          minItems: 1
+          maxItems: 100
           items:
             $ref: "#/components/schemas/BatchCheckResult"
     ApplicationCreate:
@@ -698,15 +726,12 @@ components:
       properties:
         code:
           type: string
-          enum:
-            - invalid_request
-            - unauthenticated
-            - forbidden
-            - not_found
-            - conflict
-            - rate_limited
-            - unavailable
-            - internal
+          description: |
+            Stable machine code. Known codes: `invalid_request`,
+            `batch_too_large`, `duplicate_correlation_id`, `unauthenticated`,
+            `invalid_end_user_token`, `forbidden`, `not_found`, `conflict`,
+            `rate_limited`, `unavailable`, `internal`. New codes may be added;
+            clients treat an unrecognized code as its HTTP status class.
         message:
           type: string
           description: Human-readable; never contains tokens or protected data.
