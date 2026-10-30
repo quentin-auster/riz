@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
@@ -30,6 +30,8 @@ tests:
 
 function modelDir(model: string, testsYaml: string): string {
   const dir = mkdtempSync(join(tmpdir(), "riz-model-"));
+  // The CLI container runs as another user; on Linux a 0700 mkdtemp dir is unreadable to it.
+  chmodSync(dir, 0o755);
   writeFileSync(join(dir, "model.fga"), model);
   writeFileSync(join(dir, "tests.yaml"), testsYaml);
   return join(dir, "model.fga");
