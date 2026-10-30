@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v5
       # In-memory datastore: enough for API integration tests, nothing persists.
       - run: docker run -d -p 8081:8080 openfga/openfga:v1.10.2 run
-      - run: curl -sf --retry 30 --retry-connrefused --retry-delay 1 http://localhost:8081/healthz
+      - run: curl -sf --retry 30 --retry-all-errors --retry-delay 1 http://localhost:8081/healthz
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -45,7 +45,7 @@ jobs:
       # .env.example holds placeholder dev values only.
       - run: cp .env.example .env
       - run: docker compose --env-file .env -f deploy/compose.yaml up -d --build --wait api
-      - run: curl -sf --retry 30 --retry-connrefused --retry-delay 1 http://localhost:8081/healthz
+      - run: curl -sf --retry 30 --retry-all-errors --retry-delay 1 http://localhost:8081/healthz
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
