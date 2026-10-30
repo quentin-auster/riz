@@ -3,6 +3,33 @@ model
 
 type user
 
+type organization
+  relations
+    define admin: [user]
+    define member: [user] or admin
+
+type application
+  relations
+    define organization: [organization]
+    define admin: admin from organization
+    define member: member from organization
+
+type team
+  relations
+    define member: [user]
+
+type project
+  relations
+    define organization: [organization]
+    define team: [team]
+    define owner: [user] or admin from organization
+    define editor: [user] or owner
+    define viewer: [user] or editor or member from team
+
 type document
   relations
-    define viewer: [user]
+    define project: [project]
+    define read: viewer from project
+    define edit: editor from project
+    define delete: owner from project
+    define share: owner from project

@@ -2,18 +2,112 @@ name: base
 model_file: ./base.fga
 
 tuples:
-  - user: user:anne
-    relation: viewer
-    object: document:1
+  - { user: user:olga, relation: admin, object: organization:acme }
+  - { user: user:mike, relation: member, object: organization:acme }
+  - { user: organization:acme, relation: organization, object: application:crm }
+  - { user: organization:acme, relation: organization, object: project:p1 }
+  - { user: team:eng, relation: team, object: project:p1 }
+  - { user: user:tara, relation: member, object: team:eng }
+  - { user: user:ed, relation: editor, object: project:p1 }
+  - { user: user:vic, relation: viewer, object: project:p1 }
+  - { user: user:pat, relation: owner, object: project:p1 }
+  - { user: project:p1, relation: project, object: document:d1 }
+  - { user: user:other, relation: viewer, object: project:p2 }
+  - { user: project:p2, relation: project, object: document:d2 }
 
 tests:
-  - name: viewer relation
+  - name: organization roles
     check:
-      - user: user:anne
-        object: document:1
+      - user: user:olga
+        object: organization:acme
+        assertions: { admin: true, member: true }
+      - user: user:mike
+        object: organization:acme
+        assertions: { admin: false, member: true }
+      - user: user:vic
+        object: organization:acme
+        assertions: { admin: false, member: false }
+
+  - name: application roles come from the organization
+    check:
+      - user: user:olga
+        object: application:crm
+        assertions: { admin: true, member: true }
+      - user: user:mike
+        object: application:crm
+        assertions: { admin: false, member: true }
+      - user: user:vic
+        object: application:crm
+        assertions: { admin: false, member: false }
+
+  - name: team membership
+    check:
+      - user: user:tara
+        object: team:eng
+        assertions: { member: true }
+      - user: user:vic
+        object: team:eng
+        assertions: { member: false }
+
+  - name: project roles inherit downward
+    check:
+      - user: user:olga
+        object: project:p1
+        assertions: { owner: true, editor: true, viewer: true }
+      - user: user:pat
+        object: project:p1
+        assertions: { owner: true, editor: true, viewer: true }
+      - user: user:ed
+        object: project:p1
+        assertions: { owner: false, editor: true, viewer: true }
+      - user: user:vic
+        object: project:p1
+        assertions: { owner: false, editor: false, viewer: true }
+      - user: user:tara
+        object: project:p1
+        assertions: { owner: false, editor: false, viewer: true }
+      - user: user:mike
+        object: project:p1
+        assertions: { owner: false, editor: false, viewer: false }
+
+  - name: document permissions
+    check:
+      - user: user:pat
+        object: document:d1
+        assertions: { read: true, edit: true, delete: true, share: true }
+      - user: user:ed
+        object: document:d1
+        assertions: { read: true, edit: true, delete: false, share: false }
+      - user: user:vic
+        object: document:d1
+        assertions: { read: true, edit: false, delete: false, share: false }
+      - user: user:tara
+        object: document:d1
+        assertions: { read: true, edit: false, delete: false, share: false }
+      - user: user:mike
+        object: document:d1
+        assertions: { read: false, edit: false, delete: false, share: false }
+      - user: user:other
+        object: document:d1
+        assertions: { read: false, edit: false, delete: false, share: false }
+
+  - name: access to one project does not leak to another
+    check:
+      - user: user:other
+        object: document:d2
+        assertions: { read: true, edit: false, delete: false, share: false }
+      - user: user:pat
+        object: document:d2
+        assertions: { read: false, edit: false, delete: false, share: false }
+    list_objects:
+      - user: user:vic
+        type: document
         assertions:
-          viewer: true
-      - user: user:bob
-        object: document:1
+          read:
+            - document:d1
+          edit: []
+      - user: user:other
+        type: document
         assertions:
-          viewer: false
+          read:
+            - document:d2

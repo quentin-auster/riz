@@ -20,6 +20,12 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: make model-test
+
   python:
     runs-on: ubuntu-latest
     steps:

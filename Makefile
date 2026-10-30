@@ -1,6 +1,8 @@
 COMPOSE = docker compose --env-file .env -f deploy/compose.yaml
 
-.PHONY: install format lint typecheck test up down
+FGA_CLI = openfga/cli:v0.8.2
+
+.PHONY: install format lint typecheck test model-test up down
 
 install:
 	pnpm install --frozen-lockfile
@@ -21,6 +23,9 @@ typecheck:
 test:
 	pnpm test
 	uv run pytest sdks/python
+
+model-test:
+	docker run --rm -v "$(CURDIR)/models/openfga:/models:ro" $(FGA_CLI) model test --tests /models/tests.yaml
 
 up:
 	$(COMPOSE) up --build -d
