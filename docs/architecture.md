@@ -14,4 +14,7 @@ Console (SvelteKit) --HTTP--> riz API
 - The API resolves store and model IDs server-side; callers never supply them.
 - OpenFGA and riz use separate databases and credentials.
 
+Each application gets its own OpenFGA store, and inheritance does not cross
+stores. See [ADR 0001: store isolation](decisions/0001-store-isolation.md).
+
 Decisions are recorded in [docs/decisions](decisions/).
