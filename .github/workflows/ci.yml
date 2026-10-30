@@ -7,8 +7,26 @@ on:
 jobs:
   node:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      RIZ_DATABASE_URL: postgres://postgres:ci@localhost:5432/postgres
+      OPENFGA_API_URL: http://localhost:8081
     steps:
       - uses: actions/checkout@v5
+      # In-memory datastore: enough for API integration tests, nothing persists.
+      - run: docker run -d -p 8081:8080 openfga/openfga:v1.10.2 run
+      - run: curl -sf --retry 30 --retry-all-errors --retry-delay 1 http://localhost:8081/healthz
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v5
         with:
@@ -19,6 +37,27 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # .env.example holds placeholder dev values only.
+      - run: cp .env.example .env
+      - run: docker compose --env-file .env -f deploy/compose.yaml up -d --build --wait api
+      - run: curl -sf --retry 30 --retry-all-errors --retry-delay 1 http://localhost:8081/healthz
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @riz/api test:integration
+        env:
+          RIZ_API_URL: http://localhost:8080
+          OPENFGA_API_URL: http://localhost:8081
+      - if: failure()
+        run: docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api openfga
 
   model:
     runs-on: ubuntu-latest

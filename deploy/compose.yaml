@@ -8,6 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set in .env}
       OPENFGA_DB_PASSWORD: ${OPENFGA_DB_PASSWORD:?set in .env}
       RIZ_DB_PASSWORD: ${RIZ_DB_PASSWORD:?set in .env}
+    # Loopback only, so host-run tooling (make migrate, API tests) can reach it.
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
       - pgdata:/var/lib/postgresql/data
@@ -46,10 +49,22 @@ services:
     environment:
       PORT: "8080"
       OPENFGA_API_URL: http://openfga:8080
+      RIZ_DATABASE_URL: postgres://riz:${RIZ_DB_PASSWORD:?set in .env}@postgres:5432/riz
+      # Local development only: the image defaults to production, which refuses fixture auth.
+      NODE_ENV: development
+      RIZ_AUTH_MODE: fixture
+      RIZ_FIXTURE_AUTH_FILE: /etc/riz/auth.json
+      RIZ_FIXTURE_END_USERS_FILE: /etc/riz/end-users.json
+    volumes:
+      - ./fixtures/auth.json:/etc/riz/auth.json:ro
+      - ./fixtures/end-users.json:/etc/riz/end-users.json:ro
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
-      - openfga
+      postgres:
+        condition: service_healthy
+      openfga:
+        condition: service_started
 
   console:
     build:
