@@ -8,6 +8,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set in .env}
       OPENFGA_DB_PASSWORD: ${OPENFGA_DB_PASSWORD:?set in .env}
       RIZ_DB_PASSWORD: ${RIZ_DB_PASSWORD:?set in .env}
+    # Loopback only, so host-run tooling (make migrate, API tests) can reach it.
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
       - pgdata:/var/lib/postgresql/data
