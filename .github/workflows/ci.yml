@@ -77,4 +77,4 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run mypy sdks/python/src
-      - run: uv run pytest sdks/python
+      - run: uv run pytest sdks/python tests/conformance/databricks

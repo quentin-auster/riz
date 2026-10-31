@@ -21,6 +21,8 @@ import { checkRoutes } from "./checks/routes.js";
 import { createCheckService } from "./checks/service.js";
 import { migrate } from "./db/migrate.js";
 import { readiness } from "./health.js";
+import { providerRoutes } from "./providers/routes.js";
+import { createProviderService } from "./providers/service.js";
 import { createApp } from "./server.js";
 
 function required(name: string): string {
@@ -97,6 +99,7 @@ const modelsHandler = modelRoutes(
   }),
 );
 const bindingsHandler = workloadRoutes(bindings);
+const providersHandler = providerRoutes(createProviderService({ pool }));
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
   throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
@@ -116,6 +119,7 @@ createApp({
     (await modelsHandler(req, res, principal, url)) ||
     (await explorerHandler(req, res, principal, url)) ||
     (await bindingsHandler(req, res, principal, url)) ||
+    (await providersHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),
 }).listen(port, "0.0.0.0", () => {
   console.log(JSON.stringify({ msg: "riz api listening", port }));
