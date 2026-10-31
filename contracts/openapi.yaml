@@ -462,6 +462,83 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+    post:
+      tags: [models]
+      operationId: submitModel
+      summary: Validate a model and, if its assertions hold, bind it
+      description: |
+        Permission mutation: authorized and audited. The model (OpenFGA DSL) and the
+        optional tuples are loaded into a scratch store and every assertion is checked
+        there; the application's store and binding are untouched unless all assertions
+        hold. Assertions must include at least one allow and one deny. On success a new
+        immutable model is written and bound; the previous model stays as history and
+        can be restored with `/v1/models/rollback`.
+        Required scope: `models:write`.
+      security:
+        - bearerAuth: [models:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelSubmit"
+      responses:
+        "201":
+          description: Validated, written and bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Model"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          description: >-
+            The model parsed but an assertion did not hold
+            (`assertions_failed`); nothing was bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/models/rollback:
+    post:
+      tags: [models]
+      operationId: rollbackModel
+      summary: Re-bind a model the application was bound to before
+      description: |
+        Permission mutation: authorized and audited. Only a model already recorded for
+        this application can be restored. Re-binding the active model is `409`.
+        Required scope: `models:write`.
+      security:
+        - bearerAuth: [models:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelRollback"
+      responses:
+        "200":
+          description: Re-bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Model"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /v1/audit:
     get:
       tags: [audit]
@@ -546,7 +623,7 @@ components:
       description: |
         Workload credential. Scopes: `check`, `applications:read`,
         `applications:write`, `relationships:read`, `relationships:write`,
-        `models:read`, `audit:read`. Check scopes are separate from administrative
+        `models:read`, `models:write`, `audit:read`. Check scopes are separate from administrative
         mutation scopes.
     endUserToken:
       type: apiKey
@@ -780,6 +857,47 @@ components:
         active:
           type: boolean
           description: Whether this model is the one the application is bound to.
+    ModelAssertion:
+      allOf:
+        - $ref: "#/components/schemas/Relationship"
+        - type: object
+          required: [allowed]
+          properties:
+            allowed:
+              type: boolean
+              description: Whether the check is expected to be allowed.
+    ModelSubmit:
+      type: object
+      additionalProperties: false
+      required: [application, model, assertions]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        model:
+          type: string
+          maxLength: 200000
+          description: The model in OpenFGA DSL.
+        tuples:
+          type: array
+          maxItems: 100
+          description: Tuples loaded into the scratch store for the assertions only.
+          items:
+            $ref: "#/components/schemas/Relationship"
+        assertions:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/ModelAssertion"
+    ModelRollback:
+      type: object
+      additionalProperties: false
+      required: [application, modelId]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        modelId:
+          type: string
     ModelList:
       type: object
       required: [items]

@@ -28,7 +28,7 @@ const key = (r: Relationship) => ({
  * Runs an OpenFGA call. A validation error is the caller's (unknown type or relation,
  * duplicate, missing tuple); anything else is an outage and fails closed as 503.
  */
-async function fga<T>(
+export async function fga<T>(
   call: () => Promise<T>,
   onInvalid: (message: string) => Error,
 ): Promise<T> {

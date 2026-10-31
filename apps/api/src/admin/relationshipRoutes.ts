@@ -21,7 +21,7 @@ const RELATION = /^[a-z][a-z0-9_-]{0,49}$/;
 const invalid = (message: string) =>
   new HttpError(400, "invalid_request", message);
 
-function toRelationship(v: unknown): Relationship {
+export function toRelationship(v: unknown): Relationship {
   const r = v as Record<string, unknown> | null;
   if (
     typeof r !== "object" ||
@@ -41,7 +41,7 @@ function toRelationship(v: unknown): Relationship {
   return { subject: r.subject, relation: r.relation, object: r.object };
 }
 
-function applicationOf(value: unknown): string {
+export function applicationOf(value: unknown): string {
   if (typeof value !== "string" || !ID.test(value)) {
     throw invalid("application is required.");
   }
@@ -52,7 +52,7 @@ function applicationOf(value: unknown): string {
  * Decided before the application is looked up, so an application outside the caller's
  * allow-list is 403 whether or not it exists.
  */
-function permit(principal: Principal, application: string) {
+export function permit(principal: Principal, application: string) {
   if (
     !principal.applications.includes("*") &&
     !principal.applications.includes(application)

@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
+import { modelRoutes } from "./admin/modelRoutes.js";
+import { createModelService } from "./admin/models.js";
 import { relationshipRoutes } from "./admin/relationshipRoutes.js";
 import { createRelationshipService } from "./admin/relationships.js";
 import { adminRoutes } from "./admin/routes.js";
@@ -81,6 +83,13 @@ const adminHandler = adminRoutes(admin);
 const relationshipsHandler = relationshipRoutes(
   createRelationshipService({ pool, resolver }),
 );
+const modelsHandler = modelRoutes(
+  createModelService({
+    pool,
+    lookup: dbLookup(pool),
+    apiUrl: required("OPENFGA_API_URL"),
+  }),
+);
 const bindingsHandler = workloadRoutes(bindings);
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
@@ -98,6 +107,7 @@ createApp({
   routes: async (req, res, principal, url) =>
     (await adminHandler(req, res, principal, url)) ||
     (await relationshipsHandler(req, res, principal, url)) ||
+    (await modelsHandler(req, res, principal, url)) ||
     (await bindingsHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),
 }).listen(port, "0.0.0.0", () => {
