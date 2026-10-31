@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import autocannon from "autocannon";
 
 // Load run against a running stack: RIZ_API_URL=http://localhost:8080 OPENFGA_API_URL=http://localhost:8081
-//   pnpm --filter @riz/api load
+//   pnpm --filter @riz/load load
 // Prints a markdown table. Fixture tokens are the dev-only values in deploy/fixtures.
 function required(name: string): string {
   const value = process.env[name];
