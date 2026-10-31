@@ -1,0 +1,27 @@
+model
+  schema 1.1
+
+type user
+
+# One organization, `organization:default`. Roles are tuples in riz's own store,
+# never in an application's store. Mutation permissions (can_manage_*,
+# can_register_*) are separate relations from read permissions, and the
+# auditor role grants reads only.
+type organization
+  relations
+    define security_admin: [user]
+    define auditor: [user]
+    define can_register_application: security_admin
+    define can_manage_bindings: security_admin
+    define can_read_applications: security_admin or auditor
+    define can_read_audit: security_admin or auditor
+
+# Every application carries an `organization` tuple, written when it is registered.
+type application
+  relations
+    define organization: [organization]
+    define admin: [user]
+    define can_read: admin or can_read_applications from organization
+    define can_manage_relationships: admin or security_admin from organization
+    define can_manage_model: admin or security_admin from organization
+    define can_read_audit: admin or can_read_audit from organization
