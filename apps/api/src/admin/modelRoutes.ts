@@ -97,6 +97,21 @@ export function modelRoutes(service: ModelService) {
     url: URL,
   ): Promise<boolean> => {
     const { pathname } = url;
+    const byId = /^\/v1\/models\/([0-9A-Z]{26})$/.exec(pathname)?.[1];
+    if (byId && req.method === "GET") {
+      try {
+        requireScope(principal, "models:read");
+        const application = applicationOf(url.searchParams.get("application"));
+        permit(principal, application);
+        send(res, 200, {
+          id: byId,
+          model: await service.read(application, byId),
+        });
+        return true;
+      } catch (err) {
+        throw translate(err);
+      }
+    }
     if (req.method !== "POST") return false;
     const isRollback = pathname === "/v1/models/rollback";
     if (pathname !== "/v1/models" && !isRollback) return false;

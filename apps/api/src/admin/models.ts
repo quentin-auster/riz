@@ -184,6 +184,28 @@ export function createModelService(deps: {
   }
 
   return {
+    /** The DSL of a model this application has been bound to, for comparing versions. */
+    async read(application: string, modelId: string): Promise<string> {
+      const found = await lookup(application);
+      if (!found) throw new ApplicationNotFound(application);
+      // Only models bound to this application: its store may hold others.
+      const known = await pool.query(
+        "SELECT 1 FROM model_bindings WHERE application_id = $1 AND model_id = $2",
+        [application, modelId],
+      );
+      if (!known.rowCount) throw new ModelNotFound();
+      const { authorization_model: model } = await fga(
+        () =>
+          new OpenFgaClient({
+            apiUrl,
+            storeId: found.storeId,
+          }).readAuthorizationModel({ authorizationModelId: modelId }),
+        (m) => new InvalidModel(m),
+      );
+      if (!model) throw new ModelNotFound();
+      return transformer.transformJSONToDSL(model);
+    },
+
     /** Validate, assert, write a new immutable model, then bind it. The prior row stays as history. */
     async submit(
       actor: string,

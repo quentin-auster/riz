@@ -313,6 +313,41 @@ test(
     }),
 );
 
+test(
+  "audit events can be filtered by actor and action, within the allow-list",
+  opts,
+  () =>
+    withApp(async (call) => {
+      for (const name of ["crm", "hr"]) {
+        await call("admin", "POST", "/v1/applications", {
+          name,
+          environment: "prod",
+        });
+      }
+      const events = async (who: string, query: string) =>
+        (await call(who, "GET", `/v1/audit?${query}`)).body.items;
+
+      assert.equal(
+        (await events("admin", "action=applications.create")).length,
+        2,
+      );
+      assert.equal((await events("admin", "action=models.rollback")).length, 0);
+      assert.equal((await events("admin", "actor=admin")).length, 2);
+      assert.equal((await events("admin", "actor=someone-else")).length, 0);
+      // A filter never widens what the caller may see.
+      assert.deepEqual(
+        (await events("crmOnly", "action=applications.create")).map(
+          (e) => e.application,
+        ),
+        ["crm-prod"],
+      );
+      assert.equal(
+        (await call("admin", "GET", "/v1/audit?actor=")).status,
+        400,
+      );
+    }),
+);
+
 test("a registration whose audit write fails does not commit", opts, () =>
   withApp(async (call, pool) => {
     await pool.query(`

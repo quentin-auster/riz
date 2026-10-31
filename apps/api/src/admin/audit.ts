@@ -46,6 +46,10 @@ export async function recordAudit(
 
 export interface AuditFilter {
   application?: string | undefined;
+  /** Exact match. */
+  actor?: string | undefined;
+  /** Exact match, e.g. `models.rollback`. */
+  action?: string | undefined;
   /** Inclusive. */
   from?: Date | undefined;
   /** Exclusive. */
@@ -75,6 +79,8 @@ export async function listAudit(
         AND ($5::text IS NULL OR application_id = $5)
         AND ($6::timestamptz IS NULL OR time >= $6)
         AND ($7::timestamptz IS NULL OR time < $7)
+        AND ($8::text IS NULL OR actor = $8)
+        AND ($9::text IS NULL OR action = $9)
       ORDER BY id DESC LIMIT $4`,
     [
       allowed.includes("*"),
@@ -84,6 +90,8 @@ export async function listAudit(
       filter.application ?? null,
       filter.from ?? null,
       filter.to ?? null,
+      filter.actor ?? null,
+      filter.action ?? null,
     ],
   );
   const kept = rows.slice(0, page.limit);

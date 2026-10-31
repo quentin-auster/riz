@@ -534,6 +534,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /v1/models/{modelId}:
+    get:
+      tags: [models]
+      operationId: getModel
+      summary: Read a model this application has been bound to
+      description: |
+        Returns the model as OpenFGA DSL, so versions can be compared. Only a model
+        recorded for this application is readable. Required scope: `models:read`.
+      security:
+        - bearerAuth: [models:read]
+      parameters:
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9A-Z]{26}$"
+        - $ref: "#/components/parameters/Application"
+      responses:
+        "200":
+          description: The model.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, model]
+                properties:
+                  id:
+                    type: string
+                  model:
+                    type: string
+                    description: OpenFGA DSL.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/models/rollback:
     post:
       tags: [models]
@@ -618,6 +658,18 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/ApplicationId"
+        - name: actor
+          in: query
+          description: Exact match on the subject that made the change.
+          schema:
+            type: string
+            maxLength: 128
+        - name: action
+          in: query
+          description: Exact match, for example `models.rollback`.
+          schema:
+            type: string
+            maxLength: 128
         - name: from
           in: query
           schema:

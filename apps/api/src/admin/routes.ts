@@ -47,7 +47,21 @@ function auditFilter(url: URL): AuditFilter {
   if (application !== undefined && !ID.test(application)) {
     throw new HttpError(400, "invalid_request", "Invalid application.");
   }
-  return { application, from: date("from"), to: date("to") };
+  const text = (name: string): string | undefined => {
+    const raw = url.searchParams.get(name);
+    if (raw === null) return undefined;
+    if (raw === "" || raw.length > 128) {
+      throw new HttpError(400, "invalid_request", `Invalid ${name}.`);
+    }
+    return raw;
+  };
+  return {
+    application,
+    actor: text("actor"),
+    action: text("action"),
+    from: date("from"),
+    to: date("to"),
+  };
 }
 
 function createBody(body: unknown): { name: string; environment: string } {
