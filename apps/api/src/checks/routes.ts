@@ -123,8 +123,9 @@ export function checkRoutes(deps: {
       throw new HttpError(403, "forbidden", "Missing scope check.");
     }
     const header = req.headers["riz-end-user-token"];
-    const endUser = deps.verifyEndUser(
+    const endUser = await deps.verifyEndUser(
       typeof header === "string" ? header : undefined,
+      principal,
     );
     // The subject is spliced into an OpenFGA `user:<sub>` string, so it must not
     // be able to carry `#`, `*` or whitespace.

@@ -1,7 +1,7 @@
 import type pg from "pg";
 import { ApplicationNotFound } from "../checks/resolver.js";
 import type { TokenVerifier } from "./oidc.js";
-import type { Authenticator } from "./principal.js";
+import type { Authenticator, EndUserVerifier } from "./principal.js";
 
 export interface WorkloadBinding {
   issuer: string;
@@ -36,7 +36,21 @@ export function workloadAuthenticator(
       subject: `${verified.issuer}|${workload}`,
       scopes: ["check"],
       applications: await lookup(verified.issuer, workload),
+      clientId: workload,
     };
+  };
+}
+
+/**
+ * The end user is the token's verified `sub`, and only if the token was issued
+ * to the calling workload (`azp`), so another workload cannot replay it.
+ */
+export function oidcEndUserVerifier(verify: TokenVerifier): EndUserVerifier {
+  return async (token, caller) => {
+    if (!token || !caller.clientId) return null;
+    const verified = await verify(token);
+    if (!verified || verified.claims.azp !== caller.clientId) return null;
+    return verified.subject;
   };
 }
 

@@ -43,14 +43,15 @@ test("resolves a fixture token to its principal and rejects others", async () =>
   assert.equal(await authenticate(undefined), null);
 });
 
-test("resolves a fixture end-user token to its subject and rejects others", () => {
+test("resolves a fixture end-user token to its subject and rejects others", async () => {
   const verify = endUserVerifierFromEnv({
     RIZ_AUTH_MODE: "fixture",
     RIZ_FIXTURE_END_USERS_FILE: fixtureFile(`{"${SECRET}": "alice"}`),
   });
-  assert.equal(verify(SECRET), "alice");
-  assert.equal(verify("other"), null);
-  assert.equal(verify(undefined), null);
+  const caller = { subject: "svc", scopes: [], applications: [] };
+  assert.equal(await verify(SECRET, caller), "alice");
+  assert.equal(await verify("other", caller), null);
+  assert.equal(await verify(undefined, caller), null);
 });
 
 test("a malformed fixture file is rejected without echoing its contents", () => {

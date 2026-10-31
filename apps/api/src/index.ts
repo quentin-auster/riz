@@ -4,7 +4,11 @@ import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
 import { adminRoutes } from "./admin/routes.js";
 import { createAdminService } from "./admin/service.js";
-import { authenticatorFromEnv, endUserVerifierFromEnv } from "./auth/index.js";
+import {
+  authenticatorFromEnv,
+  endUserVerifierFromEnv,
+  oidcAuthFromEnv,
+} from "./auth/index.js";
 import { workloadRoutes } from "./auth/workloadRoutes.js";
 import { createBindingStore } from "./auth/workloads.js";
 import { createResolver, dbLookup } from "./checks/resolver.js";
@@ -20,7 +24,6 @@ function required(name: string): string {
   return value;
 }
 
-const authenticate = authenticatorFromEnv(process.env);
 const pool = new pg.Pool({
   connectionString: required("RIZ_DATABASE_URL"),
   // A saturated pool must fail a request, not hang it.
@@ -28,6 +31,15 @@ const pool = new pg.Pool({
 });
 // An idle-client error (e.g. Postgres restart) must not crash the process.
 pool.on("error", () => console.error(JSON.stringify({ msg: "pool error" })));
+
+const bindings = createBindingStore(pool);
+const { authenticate, verifyEndUser } =
+  process.env.RIZ_AUTH_MODE === "oidc"
+    ? oidcAuthFromEnv(process.env, bindings.lookup)
+    : {
+        authenticate: authenticatorFromEnv(process.env),
+        verifyEndUser: endUserVerifierFromEnv(process.env),
+      };
 
 const migrator = await pool.connect();
 try {
@@ -63,10 +75,10 @@ const checks = checkRoutes({
     resolver: createResolver(dbLookup(pool), required("OPENFGA_API_URL")),
     timeoutMs: checkTimeoutMs,
   }),
-  verifyEndUser: endUserVerifierFromEnv(process.env),
+  verifyEndUser,
 });
 const adminHandler = adminRoutes(admin);
-const bindingsHandler = workloadRoutes(createBindingStore(pool));
+const bindingsHandler = workloadRoutes(bindings);
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
   throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
