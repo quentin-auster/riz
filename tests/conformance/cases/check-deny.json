@@ -1,0 +1,30 @@
+{
+  "name": "check resolves not allowed when riz answers deny",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "delete",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check",
+    "body": {
+      "application": "crm",
+      "relation": "delete",
+      "object": "document:d1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": { "status": "deny", "requestId": "req_2", "modelId": "model_1" }
+  },
+  "expect": {
+    "result": {
+      "allowed": false,
+      "status": "deny",
+      "requestId": "req_2",
+      "modelId": "model_1"
+    }
+  }
+}

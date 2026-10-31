@@ -1,0 +1,29 @@
+{
+  "name": "check raises an api error when rate limited, without retrying",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 429,
+    "body": {
+      "code": "rate_limited",
+      "message": "Too many requests.",
+      "requestId": "req_9"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizApiError",
+      "status": 429,
+      "code": "rate_limited",
+      "requestId": "req_9"
+    }
+  }
+}

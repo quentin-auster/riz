@@ -1,0 +1,25 @@
+{
+  "name": "check raises an api error when a 200 has no usable decision",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 200,
+    "body": { "ok": true }
+  },
+  "nonconformingResponse": true,
+  "expect": {
+    "error": {
+      "type": "RizApiError",
+      "status": 200,
+      "code": "invalid_response"
+    }
+  }
+}

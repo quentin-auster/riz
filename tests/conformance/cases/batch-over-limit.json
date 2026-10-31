@@ -1,0 +1,28 @@
+{
+  "name": "batch check raises a validation error when riz refuses an oversize batch",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "checks": [{ "action": "read", "resource": "document:d1", "count": 101 }]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "code": "batch_too_large",
+      "message": "A batch holds at most 100 checks.",
+      "requestId": "req_15"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizValidationError",
+      "status": 400,
+      "code": "batch_too_large",
+      "requestId": "req_15"
+    }
+  }
+}

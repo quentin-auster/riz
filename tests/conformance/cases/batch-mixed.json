@@ -1,0 +1,43 @@
+{
+  "name": "batch check returns decisions in input order whatever order riz answers in",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "checks": [
+      { "action": "read", "resource": "document:d1" },
+      { "action": "delete", "resource": "document:d1" }
+    ]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check",
+    "body": {
+      "application": "crm",
+      "checks": [
+        { "correlationId": "0", "relation": "read", "object": "document:d1" },
+        { "correlationId": "1", "relation": "delete", "object": "document:d1" }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "requestId": "req_12",
+      "modelId": "model_1",
+      "results": [
+        { "correlationId": "1", "status": "deny" },
+        { "correlationId": "0", "status": "allow" }
+      ]
+    }
+  },
+  "expect": {
+    "result": {
+      "requestId": "req_12",
+      "modelId": "model_1",
+      "results": [
+        { "status": "allow", "allowed": true },
+        { "status": "deny", "allowed": false }
+      ]
+    }
+  }
+}

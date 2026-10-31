@@ -1,0 +1,36 @@
+{
+  "name": "batch check treats an item riz did not answer as indeterminate",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "checks": [
+      { "action": "read", "resource": "document:d1" },
+      { "action": "read", "resource": "document:d2" },
+      { "action": "read", "resource": "document:d3" }
+    ]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "requestId": "req_14",
+      "modelId": "model_1",
+      "results": [
+        { "correlationId": "0", "status": "allow" },
+        { "correlationId": "2", "status": "deny" }
+      ]
+    }
+  },
+  "expect": {
+    "result": {
+      "results": [
+        { "status": "allow", "allowed": true },
+        { "status": "indeterminate", "allowed": false },
+        { "status": "deny", "allowed": false }
+      ]
+    }
+  }
+}

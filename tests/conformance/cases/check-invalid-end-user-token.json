@@ -1,0 +1,29 @@
+{
+  "name": "check raises an auth error for a rejected end-user token",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 401,
+    "body": {
+      "code": "invalid_end_user_token",
+      "message": "Missing or invalid end-user token.",
+      "requestId": "req_5"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizAuthError",
+      "status": 401,
+      "code": "invalid_end_user_token",
+      "requestId": "req_5"
+    }
+  }
+}

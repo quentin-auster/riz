@@ -1,0 +1,22 @@
+{
+  "name": "check raises a timeout error when riz does not answer in time",
+  "client": { "timeoutMs": 100 },
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "delayMs": 1000,
+    "status": 200,
+    "body": { "status": "allow", "requestId": "req_11", "modelId": "model_1" }
+  },
+  "expect": {
+    "error": { "type": "RizTimeoutError" }
+  }
+}

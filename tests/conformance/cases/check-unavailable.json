@@ -1,0 +1,29 @@
+{
+  "name": "check raises an api error when riz is unavailable",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 503,
+    "body": {
+      "code": "unavailable",
+      "message": "Service unavailable.",
+      "requestId": "req_10"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizApiError",
+      "status": 503,
+      "code": "unavailable",
+      "requestId": "req_10"
+    }
+  }
+}
