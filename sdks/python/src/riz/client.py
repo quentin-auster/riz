@@ -185,11 +185,12 @@ class Riz:
         results = body.get("results")
         if request_id is None or not isinstance(results, list):
             raise _invalid_response()
-        by_id = {
-            r["correlationId"]: _str(r.get("status"))
-            for r in results
-            if isinstance(r, dict) and isinstance(r.get("correlationId"), str)
-        }
+        by_id: dict[str, str | None] = {}
+        for r in results:
+            if isinstance(r, dict) and isinstance(r.get("correlationId"), str):
+                # A repeated ID is ambiguous, so neither answer is used.
+                repeated = r["correlationId"] in by_id
+                by_id[r["correlationId"]] = None if repeated else _str(r.get("status"))
         return BatchDecision(
             request_id=request_id,
             model_id=_str(body.get("modelId")),
@@ -207,7 +208,8 @@ class Riz:
         except TimeoutError as e:
             raise RizTimeoutError(f"riz did not answer within {self._timeout} s") from e
         except httpx.HTTPError as e:
-            raise RizTransportError("could not reach riz") from e
+            # No chained cause: it can quote a header value, i.e. the end-user token.
+            raise RizTransportError(f"could not reach riz ({type(e).__name__})") from None
         try:
             parsed: object = response.json()
         except ValueError:

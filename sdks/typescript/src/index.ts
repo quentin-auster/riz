@@ -180,7 +180,11 @@ export class Riz {
     const byId = new Map<string, string | undefined>();
     for (const r of body.results) {
       if (isObject(r) && typeof r.correlationId === "string") {
-        byId.set(r.correlationId, str(r.status));
+        // A repeated ID is ambiguous, so neither answer is used.
+        byId.set(
+          r.correlationId,
+          byId.has(r.correlationId) ? undefined : str(r.status),
+        );
       }
     }
     const modelId = str(body.modelId);
@@ -221,7 +225,10 @@ export class Riz {
           { cause },
         );
       }
-      throw new RizTransportError("could not reach riz", undefined, { cause });
+      // No `cause`: fetch's error can quote a header value, i.e. the end-user token.
+      throw new RizTransportError(
+        `could not reach riz (${cause instanceof Error ? cause.name : "error"})`,
+      );
     }
     const parsed = parseJson(text);
     if (status !== 200) throw httpError(status, parsed);
