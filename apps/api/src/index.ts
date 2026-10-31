@@ -2,9 +2,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
+import { modelRoutes } from "./admin/modelRoutes.js";
+import { createModelService } from "./admin/models.js";
+import { relationshipRoutes } from "./admin/relationshipRoutes.js";
+import { createRelationshipService } from "./admin/relationships.js";
 import { adminRoutes } from "./admin/routes.js";
 import { createAdminService } from "./admin/service.js";
-import { authenticatorFromEnv, endUserVerifierFromEnv } from "./auth/index.js";
+import {
+  authenticatorFromEnv,
+  endUserVerifierFromEnv,
+  oidcAuthFromEnv,
+} from "./auth/index.js";
+import { workloadRoutes } from "./auth/workloadRoutes.js";
+import { createBindingStore } from "./auth/workloads.js";
 import { createResolver, dbLookup } from "./checks/resolver.js";
 import { checkRoutes } from "./checks/routes.js";
 import { createCheckService } from "./checks/service.js";
@@ -18,7 +28,6 @@ function required(name: string): string {
   return value;
 }
 
-const authenticate = authenticatorFromEnv(process.env);
 const pool = new pg.Pool({
   connectionString: required("RIZ_DATABASE_URL"),
   // A saturated pool must fail a request, not hang it.
@@ -26,6 +35,15 @@ const pool = new pg.Pool({
 });
 // An idle-client error (e.g. Postgres restart) must not crash the process.
 pool.on("error", () => console.error(JSON.stringify({ msg: "pool error" })));
+
+const bindings = createBindingStore(pool);
+const { authenticate, verifyEndUser } =
+  process.env.RIZ_AUTH_MODE === "oidc"
+    ? oidcAuthFromEnv(process.env, bindings.lookup)
+    : {
+        authenticate: authenticatorFromEnv(process.env),
+        verifyEndUser: endUserVerifierFromEnv(process.env),
+      };
 
 const migrator = await pool.connect();
 try {
@@ -55,15 +73,24 @@ const maxBatchSize = Number(process.env.RIZ_BATCH_MAX ?? 100);
 if (!Number.isInteger(maxBatchSize) || maxBatchSize < 1 || maxBatchSize > 100) {
   throw new Error("RIZ_BATCH_MAX must be an integer from 1 to 100");
 }
+const resolver = createResolver(dbLookup(pool), required("OPENFGA_API_URL"));
 const checks = checkRoutes({
   maxBatchSize,
-  service: createCheckService({
-    resolver: createResolver(dbLookup(pool), required("OPENFGA_API_URL")),
-    timeoutMs: checkTimeoutMs,
-  }),
-  verifyEndUser: endUserVerifierFromEnv(process.env),
+  service: createCheckService({ resolver, timeoutMs: checkTimeoutMs }),
+  verifyEndUser,
 });
 const adminHandler = adminRoutes(admin);
+const relationshipsHandler = relationshipRoutes(
+  createRelationshipService({ pool, resolver }),
+);
+const modelsHandler = modelRoutes(
+  createModelService({
+    pool,
+    lookup: dbLookup(pool),
+    apiUrl: required("OPENFGA_API_URL"),
+  }),
+);
+const bindingsHandler = workloadRoutes(bindings);
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
   throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
@@ -79,6 +106,9 @@ createApp({
   }),
   routes: async (req, res, principal, url) =>
     (await adminHandler(req, res, principal, url)) ||
+    (await relationshipsHandler(req, res, principal, url)) ||
+    (await modelsHandler(req, res, principal, url)) ||
+    (await bindingsHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),
 }).listen(port, "0.0.0.0", () => {
   console.log(JSON.stringify({ msg: "riz api listening", port }));

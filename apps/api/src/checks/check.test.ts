@@ -212,7 +212,7 @@ test(
 );
 
 test(
-  "a workload not allow-listed for the application gets 404, same as an unknown one",
+  "a workload not bound to the application gets 403, whether or not it exists",
   opts,
   () =>
     withApp(async ({ admin }) => {
@@ -224,7 +224,7 @@ test(
             "alice-token",
           )
         ).status,
-        404,
+        403,
       );
       assert.equal(
         (
@@ -492,7 +492,7 @@ test(
             BATCH,
           )
         ).status,
-        404,
+        403,
       );
       assert.equal(
         (

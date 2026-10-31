@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { OpenFgaClient } from "@openfga/sdk";
 import { transformer } from "@openfga/syntax-transformer";
@@ -14,15 +14,17 @@ function parse(modelFile: string): ModelJson {
 }
 
 /**
- * Rejects a model that does not parse, or whose sibling tests.yaml assertions fail.
- * Layout: <dir>/<name>.fga with its assertions in <dir>/tests.yaml.
+ * Rejects a model that does not parse, or whose sibling assertions fail.
+ * Layout: <dir>/<name>.fga with its assertions in <dir>/<name>.tests.yaml, else
+ * in <dir>/tests.yaml when the directory holds a single model.
  */
 export function validateModel(modelFile: string): ModelJson {
   const file = resolve(modelFile);
   const model = parse(file);
 
   // The assertions must target the model we validate (and later write), not a sibling file.
-  const testsFile = `${dirname(file)}/tests.yaml`;
+  const named = `${file.replace(/\.fga$/, "")}.tests.yaml`;
+  const testsFile = existsSync(named) ? named : `${dirname(file)}/tests.yaml`;
   const target = readFileSync(testsFile, "utf8").match(
     /^model_file:\s*(\S+)/m,
   )?.[1];
@@ -43,7 +45,7 @@ export function validateModel(modelFile: string): ModelJson {
       "model",
       "test",
       "--tests",
-      "/models/tests.yaml",
+      `/models/${basename(testsFile)}`,
     ],
     { encoding: "utf8" },
   );

@@ -47,7 +47,7 @@ export function createApp(opts: {
     }
     // Everything else, including routes that do not exist yet, requires authentication.
     if (url.pathname.startsWith("/v1/")) {
-      const principal = opts.authenticate(req.headers.authorization);
+      const principal = await opts.authenticate(req.headers.authorization);
       if (!principal) {
         throw new HttpError(
           401,

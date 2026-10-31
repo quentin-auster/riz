@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Principal } from "../auth/index.js";
 import { ApplicationNotFound } from "../checks/resolver.js";
-import { HttpError, readJson, send } from "../http.js";
+import { HttpError, readJson, requestIdOf, send } from "../http.js";
+import type { AuditFilter } from "./audit.js";
 import {
   type AdminService,
   ApplicationExists,
@@ -9,23 +10,44 @@ import {
   type PageParams,
 } from "./service.js";
 
-const ID = /^[a-z0-9][a-z0-9-]{0,62}$/;
+export const ID = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const NAME = ID;
 const ENVIRONMENT = /^[a-z0-9]{1,31}$/;
 
-function requireScope(principal: Principal, scope: string) {
+export function requireScope(principal: Principal, scope: string) {
   if (!principal.scopes.includes(scope)) {
     throw new HttpError(403, "forbidden", `Missing scope ${scope}.`);
   }
 }
 
-function pageParams(url: URL): PageParams {
+export function pageParams(url: URL): PageParams {
   const raw = url.searchParams.get("limit");
   const limit = raw === null ? 50 : Number(raw);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new HttpError(400, "invalid_request", "limit must be 1 to 100.");
   }
   return { cursor: url.searchParams.get("cursor") ?? undefined, limit };
+}
+
+function auditFilter(url: URL): AuditFilter {
+  const application = url.searchParams.get("application") ?? undefined;
+  const date = (name: string): Date | undefined => {
+    const raw = url.searchParams.get(name);
+    if (raw === null) return undefined;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      throw new HttpError(
+        400,
+        "invalid_request",
+        `${name} must be a date-time.`,
+      );
+    }
+    return d;
+  };
+  if (application !== undefined && !ID.test(application)) {
+    throw new HttpError(400, "invalid_request", "Invalid application.");
+  }
+  return { application, from: date("from"), to: date("to") };
 }
 
 function createBody(body: unknown): { name: string; environment: string } {
@@ -83,7 +105,22 @@ export function adminRoutes(service: AdminService) {
           );
         }
         const input = createBody(await readJson(req));
-        send(res, 201, await service.register(principal.subject, input));
+        send(
+          res,
+          201,
+          await service.register(principal.subject, input, requestIdOf(res)),
+        );
+      } else if (pathname === "/v1/audit" && req.method === "GET") {
+        requireScope(principal, "audit:read");
+        send(
+          res,
+          200,
+          await service.audit(
+            principal.applications,
+            pageParams(url),
+            auditFilter(url),
+          ),
+        );
       } else if (pathname === "/v1/applications" && req.method === "GET") {
         requireScope(principal, "applications:read");
         send(

@@ -21,6 +21,7 @@
   "dependencies": {
     "@openfga/sdk": "0.9.7",
     "@openfga/syntax-transformer": "0.2.2",
+    "jose": "6.2.14",
     "pg": "8.23.1"
   }
 }

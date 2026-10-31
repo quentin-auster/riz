@@ -26,6 +26,9 @@ importers:
       '@openfga/syntax-transformer':
         specifier: 0.2.2
         version: 0.2.2
+      jose:
+        specifier: 6.2.14
+        version: 6.2.14
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -773,6 +776,9 @@ packages:
 
   jose@5.10.0:
     resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
+
+  jose@6.2.14:
+    resolution: {integrity: sha512-3JasLuki1NRLQvY4wCoC37KZk4qxoBx2k2aFqLxT84IezqW0bkJKnNtxnZj/Fu1xsQivoc/lytxaRHJoGLjJ1A==}
 
   json-schema-traverse@1.0.0:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
@@ -1569,6 +1575,8 @@ snapshots:
       '@types/estree': 1.0.10
 
   jose@5.10.0: {}
+
+  jose@6.2.14: {}
 
   json-schema-traverse@1.0.0: {}
 

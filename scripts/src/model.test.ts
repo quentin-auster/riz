@@ -63,6 +63,19 @@ test("accepts the repository base model", () => {
   validateModel(resolve(import.meta.dirname, "../../models/openfga/base.fga"));
 });
 
+test("accepts the riz admin model, whose assertions sit in a named file", () => {
+  validateModel(
+    resolve(import.meta.dirname, "../../models/openfga/riz-admin.fga"),
+  );
+});
+
+test("a named tests file takes precedence over tests.yaml", () => {
+  const file = modelDir(VALID_MODEL, tests(false));
+  // tests.yaml would fail; the named file passes.
+  writeFileSync(file.replace(/\.fga$/, ".tests.yaml"), tests(true));
+  validateModel(file);
+});
+
 // Integration: needs a running OpenFGA (OPENFGA_API_URL). Unverified until run against one.
 test(
   "writing the same model twice yields two distinct IDs",

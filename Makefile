@@ -26,6 +26,7 @@ test:
 
 model-test:
 	docker run --rm -v "$(CURDIR)/models/openfga:/models:ro" $(FGA_CLI) model test --tests /models/tests.yaml
+	docker run --rm -v "$(CURDIR)/models/openfga:/models:ro" $(FGA_CLI) model test --tests /models/riz-admin.tests.yaml
 
 # Needs RIZ_DATABASE_URL (see .env.example) and `make up` Postgres running.
 migrate:

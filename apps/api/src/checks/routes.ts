@@ -123,8 +123,9 @@ export function checkRoutes(deps: {
       throw new HttpError(403, "forbidden", "Missing scope check.");
     }
     const header = req.headers["riz-end-user-token"];
-    const endUser = deps.verifyEndUser(
+    const endUser = await deps.verifyEndUser(
       typeof header === "string" ? header : undefined,
+      principal,
     );
     // The subject is spliced into an OpenFGA `user:<sub>` string, so it must not
     // be able to carry `#`, `*` or whitespace.
@@ -137,12 +138,16 @@ export function checkRoutes(deps: {
     }
     const body = await readJson(req);
     const permit = (application: string) => {
-      // Same answer as an unknown application, so existence is not leaked.
+      // Decided before the application is looked up, so a 403 says nothing about whether it exists.
       if (
         !principal.applications.includes("*") &&
         !principal.applications.includes(application)
       ) {
-        throw new HttpError(404, "not_found", "Application not found.");
+        throw new HttpError(
+          403,
+          "forbidden",
+          "Caller is not permitted for this application.",
+        );
       }
     };
 

@@ -20,7 +20,12 @@ const opts = {
   skip: url && apiUrl ? false : "RIZ_DATABASE_URL and OPENFGA_API_URL not set",
 };
 
-const ALL = ["applications:read", "applications:write", "models:read"];
+const ALL = [
+  "applications:read",
+  "applications:write",
+  "models:read",
+  "audit:read",
+];
 const principals: Record<string, Principal> = {
   admin: { subject: "admin", scopes: ALL, applications: ["*"] },
   crmOnly: { subject: "crm", scopes: ALL, applications: ["crm-prod"] },
@@ -35,7 +40,16 @@ type Call = (
 ) => Promise<{ status: number; body: Json }>;
 
 // Only the fields these tests read; a wrong shape fails the assertion, not the type.
-type Json = { id: string; items: { id: string; active: boolean }[] };
+type Json = {
+  id: string;
+  nextCursor?: string;
+  items: {
+    id: string;
+    active: boolean;
+    application?: string;
+    requestId?: string;
+  }[];
+};
 
 async function withApp(
   fn: (
@@ -216,5 +230,88 @@ test("rejects bad registrations", opts, () =>
       (await call("admin", "POST", "/v1/applications", ok)).status,
       409,
     );
+  }),
+);
+
+test(
+  "audit reads are limited to the caller's allow-list and paginate",
+  opts,
+  () =>
+    withApp(async (call) => {
+      for (const name of ["crm", "hr"]) {
+        await call("admin", "POST", "/v1/applications", {
+          name,
+          environment: "prod",
+        });
+      }
+
+      const all = await call("admin", "GET", "/v1/audit");
+      assert.equal(all.status, 200);
+      assert.deepEqual(all.body.items.map((e) => e.application).sort(), [
+        "crm-prod",
+        "hr-prod",
+      ]);
+      assert.ok(all.body.items.every((e) => e.requestId));
+
+      const scoped = await call("crmOnly", "GET", "/v1/audit");
+      assert.deepEqual(
+        scoped.body.items.map((e) => e.application),
+        ["crm-prod"],
+      );
+      assert.equal((await call("noScope", "GET", "/v1/audit")).status, 403);
+      // A filter narrows the allow-list; it cannot reach another application's events.
+      const peek = await call(
+        "crmOnly",
+        "GET",
+        "/v1/audit?application=hr-prod",
+      );
+      assert.deepEqual(peek.body.items, []);
+      const only = await call("admin", "GET", "/v1/audit?application=hr-prod");
+      assert.deepEqual(
+        only.body.items.map((e) => e.application),
+        ["hr-prod"],
+      );
+      assert.equal(
+        (await call("admin", "GET", "/v1/audit?from=yesterday-ish")).status,
+        400,
+      );
+
+      const first = await call("admin", "GET", "/v1/audit?limit=1");
+      assert.equal(first.body.items.length, 1);
+      assert.ok(first.body.nextCursor);
+      const second = await call(
+        "admin",
+        "GET",
+        `/v1/audit?limit=1&cursor=${first.body.nextCursor}`,
+      );
+      assert.notEqual(second.body.items[0]?.id, first.body.items[0]?.id);
+      assert.equal(
+        (await call("admin", "GET", "/v1/audit?cursor=nope")).status,
+        400,
+      );
+    }),
+);
+
+test("a registration whose audit write fails does not commit", opts, () =>
+  withApp(async (call, pool) => {
+    await pool.query(`
+      CREATE FUNCTION fail_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'audit store down'; END $$;
+      CREATE TRIGGER audit_down BEFORE INSERT ON audit_events
+        FOR EACH ROW EXECUTE FUNCTION fail_audit();
+    `);
+
+    const res = await call("admin", "POST", "/v1/applications", {
+      name: "crm",
+      environment: "prod",
+    });
+
+    assert.equal(res.status, 500);
+    for (const table of ["applications", "model_bindings"]) {
+      const { rows } = await pool.query(
+        `SELECT count(*)::int AS n FROM ${table}`,
+      );
+      assert.equal(rows[0].n, 0, table);
+    }
   }),
 );

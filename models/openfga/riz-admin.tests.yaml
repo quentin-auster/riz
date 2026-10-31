@@ -1,0 +1,99 @@
+name: riz-admin
+model_file: ./riz-admin.fga
+
+tuples:
+  - { user: user:olga, relation: security_admin, object: organization:default }
+  - { user: user:audrey, relation: auditor, object: organization:default }
+  - { user: organization:default, relation: organization, object: application:crm-prod }
+  - { user: organization:default, relation: organization, object: application:hr-prod }
+  - { user: user:alice, relation: admin, object: application:crm-prod }
+
+tests:
+  - name: a security admin administers the organization and every application
+    check:
+      - user: user:olga
+        object: organization:default
+        assertions:
+          can_register_application: true
+          can_manage_bindings: true
+          can_read_applications: true
+          can_read_audit: true
+      - user: user:olga
+        object: application:crm-prod
+        assertions:
+          can_read: true
+          can_manage_relationships: true
+          can_manage_model: true
+          can_read_audit: true
+      - user: user:olga
+        object: application:hr-prod
+        assertions:
+          can_read: true
+          can_manage_relationships: true
+          can_manage_model: true
+          can_read_audit: true
+
+  - name: an application admin for A cannot mutate B
+    check:
+      - user: user:alice
+        object: application:crm-prod
+        assertions:
+          can_read: true
+          can_manage_relationships: true
+          can_manage_model: true
+          can_read_audit: true
+      - user: user:alice
+        object: application:hr-prod
+        assertions:
+          can_read: false
+          can_manage_relationships: false
+          can_manage_model: false
+          can_read_audit: false
+      - user: user:alice
+        object: organization:default
+        assertions:
+          can_register_application: false
+          can_manage_bindings: false
+          can_read_applications: false
+          can_read_audit: false
+
+  - name: an auditor reads everything and mutates nothing
+    check:
+      - user: user:audrey
+        object: organization:default
+        assertions:
+          can_read_applications: true
+          can_read_audit: true
+          can_register_application: false
+          can_manage_bindings: false
+      - user: user:audrey
+        object: application:crm-prod
+        assertions:
+          can_read: true
+          can_read_audit: true
+          can_manage_relationships: false
+          can_manage_model: false
+      - user: user:audrey
+        object: application:hr-prod
+        assertions:
+          can_read: true
+          can_read_audit: true
+          can_manage_relationships: false
+          can_manage_model: false
+
+  - name: a user with no role has no permission
+    check:
+      - user: user:mallory
+        object: organization:default
+        assertions:
+          can_register_application: false
+          can_manage_bindings: false
+          can_read_applications: false
+          can_read_audit: false
+      - user: user:mallory
+        object: application:crm-prod
+        assertions:
+          can_read: false
+          can_manage_relationships: false
+          can_manage_model: false
+          can_read_audit: false
