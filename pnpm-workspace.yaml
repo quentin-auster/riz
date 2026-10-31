@@ -2,5 +2,6 @@ packages:
   - apps/*
   - sdks/typescript
   - scripts
+  - tests/load
 onlyBuiltDependencies:
   - esbuild

@@ -1,9 +1,17 @@
-import { FgaApiValidationError, type OpenFgaClient } from "@openfga/sdk";
+import {
+  ConsistencyPreference,
+  FgaApiValidationError,
+  type OpenFgaClient,
+} from "@openfga/sdk";
+import { observeOpenFga, traceHeaders } from "../observability.js";
 import {
   ApplicationNotFound,
   type createResolver,
   NoActiveModel,
 } from "./resolver.js";
+
+/** Absent means OpenFGA's own default, which is `minimize_latency`. */
+export type Consistency = "minimize_latency" | "higher_consistency";
 
 export type Decision = "allow" | "deny" | "indeterminate";
 export type IndeterminateCode = "timeout" | "backend_error" | "no_active_model";
@@ -47,6 +55,7 @@ export function createCheckService(deps: {
    */
   async function guarded<T>(
     applicationId: string,
+    operation: "check" | "batch_check",
     call: (client: OpenFgaClient, modelId: string) => Promise<T>,
     fail: (code: IndeterminateCode) => T,
   ): Promise<T> {
@@ -64,13 +73,15 @@ export function createCheckService(deps: {
     try {
       // shortcut: on timeout the OpenFGA request is abandoned, not cancelled
       // (the SDK takes no abort signal); upgrade if abandoned calls pile up.
-      return await Promise.race([
-        // clientFor always pins a model ID.
-        call(client, client.authorizationModelId as string),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Timeout()), timeoutMs);
-        }),
-      ]);
+      return await observeOpenFga(operation, () =>
+        Promise.race([
+          // clientFor always pins a model ID.
+          call(client, client.authorizationModelId as string),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Timeout()), timeoutMs);
+          }),
+        ]),
+      );
     } catch (err) {
       if (err instanceof FgaApiValidationError) throw new InvalidCheck();
       return fail(err instanceof Timeout ? "timeout" : "backend_error");
@@ -79,16 +90,32 @@ export function createCheckService(deps: {
     }
   }
 
-  const noRetry = { retryParams: { maxRetry: 0 } };
+  const requestOptions = (consistency: Consistency | undefined) => ({
+    retryParams: { maxRetry: 0 },
+    headers: traceHeaders(),
+    ...(consistency === undefined
+      ? {}
+      : {
+          consistency:
+            consistency === "higher_consistency"
+              ? ConsistencyPreference.HigherConsistency
+              : ConsistencyPreference.MinimizeLatency,
+        }),
+  });
 
   return {
     check(
       applicationId: string,
       endUser: string,
-      input: { relation: string; object: string },
+      input: {
+        relation: string;
+        object: string;
+        consistency?: Consistency | undefined;
+      },
     ): Promise<CheckResult> {
       return guarded<CheckResult>(
         applicationId,
+        "check",
         async (client, modelId) => {
           const { allowed } = await client.check(
             {
@@ -96,7 +123,7 @@ export function createCheckService(deps: {
               relation: input.relation,
               object: input.object,
             },
-            noRetry,
+            requestOptions(input.consistency),
           );
           return { status: allowed === true ? "allow" : "deny", modelId };
         },
@@ -109,6 +136,7 @@ export function createCheckService(deps: {
       applicationId: string,
       endUser: string,
       items: BatchItem[],
+      consistency?: Consistency,
     ): Promise<BatchResult> {
       const allIndeterminate = (): BatchResult => ({
         results: items.map((i) => ({
@@ -118,6 +146,7 @@ export function createCheckService(deps: {
       });
       return guarded<BatchResult>(
         applicationId,
+        "batch_check",
         async (client, modelId) => {
           const { result } = await client.batchCheck(
             {
@@ -128,7 +157,7 @@ export function createCheckService(deps: {
                 correlationId: i.correlationId,
               })),
             },
-            noRetry,
+            requestOptions(consistency),
           );
           const byId = new Map(result.map((r) => [r.correlationId, r]));
           return {

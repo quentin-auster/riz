@@ -1,0 +1,32 @@
+{
+  "name": "check sends minimize_latency when the caller asks for it",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1",
+    "consistency": "minimize_latency"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check",
+    "body": {
+      "application": "crm",
+      "relation": "read",
+      "object": "document:d1",
+      "consistency": "minimize_latency"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": { "status": "allow", "requestId": "req_31", "modelId": "model_1" }
+  },
+  "expect": {
+    "result": {
+      "allowed": true,
+      "status": "allow",
+      "requestId": "req_31",
+      "modelId": "model_1"
+    }
+  }
+}

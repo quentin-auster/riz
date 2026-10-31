@@ -1,0 +1,32 @@
+{
+  "name": "check sends higher_consistency when the caller asks for it",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1",
+    "consistency": "higher_consistency"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check",
+    "body": {
+      "application": "crm",
+      "relation": "read",
+      "object": "document:d1",
+      "consistency": "higher_consistency"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": { "status": "deny", "requestId": "req_30", "modelId": "model_1" }
+  },
+  "expect": {
+    "result": {
+      "allowed": false,
+      "status": "deny",
+      "requestId": "req_30",
+      "modelId": "model_1"
+    }
+  }
+}

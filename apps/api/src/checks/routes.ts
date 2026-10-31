@@ -1,8 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EndUserVerifier, Principal } from "../auth/index.js";
 import { HttpError, readJson, requestIdOf, send } from "../http.js";
+import { recordBatchSize, recordDecisions } from "../observability.js";
 import { ApplicationNotFound } from "./resolver.js";
-import { type BatchItem, type CheckService, InvalidCheck } from "./service.js";
+import {
+  type BatchItem,
+  type CheckService,
+  type Consistency,
+  InvalidCheck,
+} from "./service.js";
 
 const APPLICATION = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const SUBJECT = /^[A-Za-z0-9._@+-]{1,128}$/;
@@ -38,10 +44,23 @@ function applicationOf(b: Record<string, unknown>): string {
   return b.application;
 }
 
+function consistencyOf(b: Record<string, unknown>): Consistency | undefined {
+  if (b.consistency === undefined) return undefined;
+  if (
+    b.consistency !== "minimize_latency" &&
+    b.consistency !== "higher_consistency"
+  ) {
+    throw invalid(
+      "consistency must be minimize_latency or higher_consistency.",
+    );
+  }
+  return b.consistency;
+}
+
 function checkBody(body: unknown) {
   if (
     !isObject(body) ||
-    !hasOnly(body, ["application", "relation", "object"]) ||
+    !hasOnly(body, ["application", "relation", "object", "consistency"]) ||
     !isCheck(body)
   ) {
     throw invalid(
@@ -52,14 +71,19 @@ function checkBody(body: unknown) {
     application: applicationOf(body),
     relation: body.relation,
     object: body.object,
+    consistency: consistencyOf(body),
   };
 }
 
 function batchBody(body: unknown, maxBatchSize: number) {
-  if (!isObject(body) || !hasOnly(body, ["application", "checks"])) {
+  if (
+    !isObject(body) ||
+    !hasOnly(body, ["application", "checks", "consistency"])
+  ) {
     throw invalid("Body must be {application, checks}.");
   }
   const application = applicationOf(body);
+  const consistency = consistencyOf(body);
   const { checks } = body;
   if (!Array.isArray(checks) || checks.length === 0) {
     throw invalid("checks must be a non-empty array.");
@@ -99,7 +123,7 @@ function batchBody(body: unknown, maxBatchSize: number) {
       object: c.object,
     };
   });
-  return { application, items };
+  return { application, items, consistency };
 }
 
 /** Returns true if the request was handled. Business logic lives in the service. */
@@ -154,13 +178,30 @@ export function checkRoutes(deps: {
     try {
       let result: object;
       if (isBatch) {
-        const { application, items } = batchBody(body, deps.maxBatchSize);
+        const { application, items, consistency } = batchBody(
+          body,
+          deps.maxBatchSize,
+        );
         permit(application);
-        result = await deps.service.batch(application, endUser, items);
+        recordBatchSize(items.length);
+        const batch = await deps.service.batch(
+          application,
+          endUser,
+          items,
+          consistency,
+        );
+        recordDecisions(batch.results.map((r) => r.status));
+        result = batch;
       } else {
         const input = checkBody(body);
         permit(input.application);
-        result = await deps.service.check(input.application, endUser, input);
+        const single = await deps.service.check(
+          input.application,
+          endUser,
+          input,
+        );
+        recordDecisions([single.status]);
+        result = single;
       }
       send(res, 200, { ...result, requestId: requestIdOf(res) });
     } catch (err) {

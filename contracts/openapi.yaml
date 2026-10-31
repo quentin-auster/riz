@@ -909,6 +909,19 @@ components:
           examples: [read]
         object:
           $ref: "#/components/schemas/ObjectRef"
+        consistency:
+          $ref: "#/components/schemas/Consistency"
+    Consistency:
+      type: string
+      enum: [minimize_latency, higher_consistency]
+      description: |
+        How fresh the relationship data behind a decision must be. Omit it for the
+        OpenFGA default, `minimize_latency`.
+
+        - `minimize_latency`: may be served from OpenFGA's cache, so a recently revoked
+          relationship can still be allowed until that cache entry expires.
+        - `higher_consistency`: evaluated against the latest writes, so a revocation
+          already committed to OpenFGA is seen. It costs more latency and datastore load.
     ExplorerCheckRequest:
       type: object
       additionalProperties: false
@@ -1001,6 +1014,8 @@ components:
           maxItems: 100
           items:
             $ref: "#/components/schemas/BatchCheckItem"
+        consistency:
+          $ref: "#/components/schemas/Consistency"
     BatchCheckResult:
       type: object
       required: [correlationId, status]

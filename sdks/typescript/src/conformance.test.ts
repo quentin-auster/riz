@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Riz } from "./index.js";
+import { type Consistency, Riz } from "./index.js";
 
 // Runs the shared cases in tests/conformance; see its README for the format.
 const casesDir = join(import.meta.dirname, "../../../tests/conformance/cases");
@@ -17,6 +17,7 @@ type Case = {
   call: {
     operation: "check" | "batchCheck";
     endUserToken: string;
+    consistency?: Consistency;
     action?: string;
     resource?: string;
     checks?: { action: string; resource: string; count?: number }[];
@@ -99,12 +100,16 @@ async function run(c: Case) {
               action: call.action as string,
               resource: call.resource as string,
               endUserToken: call.endUserToken,
+              ...(call.consistency && { consistency: call.consistency }),
             })
           : await riz.batchCheck(
               (call.checks ?? []).flatMap(({ count = 1, ...check }) =>
                 Array.from({ length: count }, () => check),
               ),
-              { endUserToken: call.endUserToken },
+              {
+                endUserToken: call.endUserToken,
+                ...(call.consistency && { consistency: call.consistency }),
+              },
             );
     } catch (e) {
       error = e;

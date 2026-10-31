@@ -1,0 +1,45 @@
+{
+  "name": "batch check sends higher_consistency once for the whole batch",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "consistency": "higher_consistency",
+    "checks": [
+      { "action": "read", "resource": "document:d1" },
+      { "action": "delete", "resource": "document:d1" }
+    ]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check",
+    "body": {
+      "application": "crm",
+      "consistency": "higher_consistency",
+      "checks": [
+        { "correlationId": "0", "relation": "read", "object": "document:d1" },
+        { "correlationId": "1", "relation": "delete", "object": "document:d1" }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "requestId": "req_32",
+      "modelId": "model_1",
+      "results": [
+        { "correlationId": "0", "status": "allow" },
+        { "correlationId": "1", "status": "deny" }
+      ]
+    }
+  },
+  "expect": {
+    "result": {
+      "requestId": "req_32",
+      "modelId": "model_1",
+      "results": [
+        { "status": "allow", "allowed": true },
+        { "status": "deny", "allowed": false }
+      ]
+    }
+  }
+}
