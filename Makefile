@@ -22,7 +22,7 @@ typecheck:
 
 test:
 	pnpm test
-	uv run pytest sdks/python
+	uv run pytest sdks/python tests/conformance/databricks
 
 model-test:
 	docker run --rm -v "$(CURDIR)/models/openfga:/models:ro" $(FGA_CLI) model test --tests /models/tests.yaml
