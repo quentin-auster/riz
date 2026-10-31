@@ -17,7 +17,9 @@ const invalid = (message: string) =>
 
 /**
  * "Can principal P do R on O in application X?" for administrators. Unlike /v1/check, the
- * caller names the principal, so it has its own scope and every query is audited.
+ * caller names the principal, so it has its own scope and every answered query is audited.
+ * shortcut: refused or invalid attempts (403, 404, 400) leave no audit row; audit them
+ * with a failure outcome when schema probing becomes a concern.
  * Returns true if the request was handled.
  */
 export function explorerRoutes(deps: { checks: CheckService; pool: pg.Pool }) {

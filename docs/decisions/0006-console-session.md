@@ -28,3 +28,9 @@ optionally `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`.
   console login against the current API reaches pages but every admin call is 403. The
   console is tested against a mock OIDC provider and a stubbed API; login against a real
   IdP and the real API is **unverified**.
+- Sign out ends the console session only; it lands on a static page and does not call the
+  IdP's end-session endpoint, so the IdP session may stay active.
+- Behind a TLS-terminating proxy the Origin check compares against the origin adapter-node
+  derives, so set `ORIGIN` for the console explicitly; every mutation is otherwise 403.
+  The compose and Dockerfile do not set it yet.
+- The login-state cookie is not signed, and abandoned sessions are not swept from memory.

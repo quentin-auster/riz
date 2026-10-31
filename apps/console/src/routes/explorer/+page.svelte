@@ -3,7 +3,7 @@
 </script>
 
 <h1>Access explorer</h1>
-<p>Can a principal hold a relation on an object? Every query is audited.</p>
+<p>Can a principal hold a relation on an object? Answered queries are audited.</p>
 
 <form method="POST" action="?/check">
   <input name="application" value={form?.query?.application ?? ""} placeholder="Application, e.g. crm-prod" aria-label="Application" required />

@@ -22,6 +22,8 @@ export async function apiJson<T>(
   fetchImpl: typeof fetch = fetch,
 ): Promise<T> {
   const res = await fetchImpl(`${apiUrl}${path}`, {
+    // A hung API must fail the page, not hold it open.
+    signal: AbortSignal.timeout(10_000),
     method: init.method ?? "GET",
     headers: {
       authorization: `Bearer ${session.accessToken}`,

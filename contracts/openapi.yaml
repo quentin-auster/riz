@@ -616,8 +616,9 @@ paths:
       description: |
         Answers "can `principal` hold `relation` on `object` in `application`?" for
         administrators. Unlike `/v1/check`, the caller names the principal, so this has its
-        own scope and the caller's application allow-list applies. Every query is audited
-        (`explorer.check`); if the audit event cannot be recorded, no answer is returned.
+        own scope and the caller's application allow-list applies. Every answered query
+        is audited (`explorer.check`); if the audit event cannot be recorded, no answer is
+        returned. Refused or invalid requests are not audited.
         Required scope: `explorer:check`.
       security:
         - bearerAuth: [explorer:check]

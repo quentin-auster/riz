@@ -1,6 +1,6 @@
 import type { Session } from "./session.js";
 
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+const PUBLIC_PATHS = new Set(["/login", "/auth/callback", "/signed-out"]);
 
 /** Where an unauthenticated request goes, or null if it may proceed. */
 export function loginRedirect(
