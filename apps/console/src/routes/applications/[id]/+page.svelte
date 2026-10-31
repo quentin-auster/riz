@@ -12,6 +12,8 @@
   <dd>{data.active ? data.active.id : "None"}</dd>
 </dl>
 
+<p><a href={`/applications/${data.application.id}/relationships`}>Relationships</a></p>
+
 <h2>Prior models</h2>
 {#if data.prior.length === 0}
   <p>No prior models.</p>
