@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/*.test.ts"
+    "test": "tsx --test src/*.test.ts",
+    "test:integration": "tsx --test tests/integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "22.18.10",

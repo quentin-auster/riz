@@ -31,9 +31,10 @@ model-test:
 migrate:
 	pnpm --filter @riz/api migrate
 
-# Black-box API tests against the compose stack; needs `make up` first.
+# Black-box API and SDK tests against the compose stack; needs `make up` first.
 integration:
 	RIZ_API_URL=http://localhost:8080 OPENFGA_API_URL=http://localhost:8081 pnpm --filter @riz/api test:integration
+	RIZ_API_URL=http://localhost:8080 OPENFGA_API_URL=http://localhost:8081 pnpm --filter @riz/sdk test:integration
 
 up:
 	$(COMPOSE) up --build -d --wait
