@@ -643,6 +643,89 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /v1/providers/databricks:
+    get:
+      tags: [providers]
+      operationId: getDatabricksProvider
+      summary: Read an application's Databricks settings
+      description: |
+        Non-secret settings only. Credentials are never stored or returned: queries run
+        with the end user's own token (ADR 0007). Required scope: `providers:read`, or
+        `check` so the bound workload can read its own settings. The caller's application
+        allow-list applies.
+      security:
+        - bearerAuth: [providers:read]
+        - bearerAuth: [check]
+      parameters:
+        - $ref: "#/components/parameters/Application"
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabricksProvider"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          description: The provider is not configured for this application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      tags: [providers]
+      operationId: putDatabricksProvider
+      summary: Create or replace an application's Databricks settings
+      description: |
+        Audited (`providers.put`); the audit event ID is in `Riz-Audit-Event-Id`. Unknown
+        fields, including any credential, are rejected. Required scope: `providers:write`;
+        the caller's application allow-list applies.
+      security:
+        - bearerAuth: [providers:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabricksProviderRequest"
+      responses:
+        "204":
+          description: Stored.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [providers]
+      operationId: deleteDatabricksProvider
+      summary: Remove an application's Databricks settings
+      description: |
+        Audited (`providers.delete`). Required scope: `providers:write`; the caller's
+        application allow-list applies.
+      security:
+        - bearerAuth: [providers:write]
+      parameters:
+        - $ref: "#/components/parameters/Application"
+      responses:
+        "204":
+          description: Removed.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/audit:
     get:
       tags: [audit]
@@ -739,7 +822,8 @@ components:
       description: |
         Workload credential. Scopes: `check`, `applications:read`,
         `applications:write`, `relationships:read`, `relationships:write`,
-        `models:read`, `models:write`, `audit:read`, `explorer:check`. Check scopes are separate
+        `models:read`, `models:write`, `audit:read`, `explorer:check`, `providers:read`,
+        `providers:write`. Check scopes are separate
         from administrative mutation scopes, and `explorer:check` (checking as another principal)
         is separate from `check`.
     endUserToken:
@@ -842,6 +926,38 @@ components:
           examples: [read]
         object:
           $ref: "#/components/schemas/ObjectRef"
+    DatabricksConfig:
+      type: object
+      additionalProperties: false
+      required: [workspaceHost, warehouseId]
+      properties:
+        workspaceHost:
+          type: string
+          description: A bare lower-case host name; no scheme, port, path or credentials.
+          examples: [dbc-1234.cloud.databricks.com]
+        warehouseId:
+          type: string
+          pattern: "^[A-Za-z0-9]{1,64}$"
+    DatabricksProviderRequest:
+      type: object
+      additionalProperties: false
+      required: [application, config]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        config:
+          $ref: "#/components/schemas/DatabricksConfig"
+    DatabricksProvider:
+      type: object
+      required: [application, provider, config]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        provider:
+          type: string
+          enum: [databricks]
+        config:
+          $ref: "#/components/schemas/DatabricksConfig"
     CheckResponse:
       type: object
       required: [status, requestId]
