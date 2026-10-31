@@ -1,0 +1,124 @@
+# riz API: stateless, so any replica count works (docs/decisions/0009-multi-replica.md).
+# Postgres and OpenFGA are external dependencies and are not managed here. Set the URLs below
+# to yours, and create the `riz-api` Secret first (see README.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: riz-api
+  namespace: riz
+data:
+  PORT: "8080"
+  RIZ_AUTH_MODE: oidc
+  OPENFGA_API_URL: http://openfga.openfga.svc.cluster.local:8080
+  # Workload and end-user token issuers. Replace with your identity provider.
+  RIZ_OIDC_ISSUERS: >-
+    [{"issuer":"https://idp.example.invalid/","audience":"riz","jwksUri":"https://idp.example.invalid/.well-known/jwks.json"}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: riz-api
+  namespace: riz
+  labels:
+    app.kubernetes.io/name: riz-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: riz-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: riz-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          # Build and publish this image yourself (deploy/api.Dockerfile).
+          image: riz-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: riz-api
+          env:
+            - name: RIZ_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: riz-api
+                  key: database-url
+          # Liveness never checks dependencies, so an outage does not restart healthy pods.
+          # Readiness does, so a pod that cannot reach Postgres or OpenFGA leaves the Service.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: riz-api
+  namespace: riz
+spec:
+  selector:
+    app.kubernetes.io/name: riz-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: riz-api
+  namespace: riz
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: riz-api
+---
+# Example: needs a metrics-server. Scales on CPU against the request above. When this is
+# applied, remove `replicas` from the Deployment so the two do not fight.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: riz-api
+  namespace: riz
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: riz-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
