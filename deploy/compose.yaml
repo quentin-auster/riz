@@ -100,8 +100,10 @@ services:
       - ./lb.nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "127.0.0.1:8090:80"
+    # nginx resolves the replicas once at start, so wait until every one is up.
     depends_on:
-      - api-replica
+      api-replica:
+        condition: service_healthy
 
   # Opt-in: docker compose --profile observability up. With these in .env:
   #   OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318  RIZ_METRICS_PORT=9464  RIZ_OPENFGA_TRACE=true
