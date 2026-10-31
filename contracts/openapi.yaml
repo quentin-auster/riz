@@ -17,9 +17,13 @@ info:
     **Applications.** An application's `id` is server-assigned as
     `<name>-<environment>` and is the only application reference in requests. The
     bearer token carries an allow-list of application IDs (`*` covers every
-    application, for platform administrators). An unknown application and one the
-    token is not allow-listed for are indistinguishable (`404 not_found`), so
-    existence is not leaked. A missing scope is `403 forbidden`. Registering an
+    application, for platform administrators). For application reads, an unknown
+    application and one the token is not allow-listed for are indistinguishable
+    (`404 not_found`), so existence is not leaked. Checks against an application
+    the workload is not bound to are `403 forbidden`, decided before the
+    application is looked up, so that also says nothing about existence. A
+    workload's allow-list is its bindings (`/v1/workload-bindings`), and it holds
+    only the `check` scope. A missing scope is `403 forbidden`. Registering an
     application needs `applications:write` and the `*` allow-list, since a
     duplicate would otherwise reveal that an ID exists.
 
@@ -261,6 +265,69 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+  /v1/workload-bindings:
+    post:
+      tags: [workloads]
+      operationId: bindWorkload
+      summary: Allow a workload to check against an application
+      description: |
+        A workload (a verified token's issuer and `azp`, `client_id` or `sub`)
+        may check only against the applications bound to it; it is granted the
+        `check` scope and nothing else. Idempotent. Audited. Required scope:
+        `bindings:write`, with an all-applications allow-list.
+      security:
+        - bearerAuth: [bindings:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkloadBinding"
+      responses:
+        "201":
+          description: Bound.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadBinding"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [workloads]
+      operationId: unbindWorkload
+      summary: Remove a workload's binding to an application
+      description: |
+        Idempotent. Audited. Required scope: `bindings:write`, with an
+        all-applications allow-list.
+      security:
+        - bearerAuth: [bindings:write]
+      parameters:
+        - name: issuer
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: workload
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Application"
+      responses:
+        "204":
+          description: Not bound (removed, or it never was).
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
   /v1/relationships:
     get:
@@ -523,6 +590,19 @@ components:
       type: string
       pattern: "^[a-z0-9][a-z0-9-]{0,62}$"
       examples: [crm]
+    WorkloadBinding:
+      type: object
+      required: [issuer, workload, application]
+      additionalProperties: false
+      properties:
+        issuer:
+          type: string
+          description: The token issuer (`iss`) the workload authenticates with.
+        workload:
+          type: string
+          description: The workload's `azp`, else `client_id`, else `sub`.
+        application:
+          $ref: "#/components/schemas/ApplicationId"
     ObjectRef:
       type: string
       description: OpenFGA object, `type:id`.

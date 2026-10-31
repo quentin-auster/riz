@@ -137,12 +137,16 @@ export function checkRoutes(deps: {
     }
     const body = await readJson(req);
     const permit = (application: string) => {
-      // Same answer as an unknown application, so existence is not leaked.
+      // Decided before the application is looked up, so a 403 says nothing about whether it exists.
       if (
         !principal.applications.includes("*") &&
         !principal.applications.includes(application)
       ) {
-        throw new HttpError(404, "not_found", "Application not found.");
+        throw new HttpError(
+          403,
+          "forbidden",
+          "Caller is not permitted for this application.",
+        );
       }
     };
 

@@ -33,14 +33,14 @@ test("refuses to start when no auth mode is configured", () => {
   assert.throws(() => authenticatorFromEnv({}), /RIZ_AUTH_MODE/);
 });
 
-test("resolves a fixture token to its principal and rejects others", () => {
+test("resolves a fixture token to its principal and rejects others", async () => {
   const authenticate = authenticatorFromEnv({
     RIZ_AUTH_MODE: "fixture",
     RIZ_FIXTURE_AUTH_FILE: fixtureFile(valid),
   });
-  assert.equal(authenticate(`Bearer ${SECRET}`)?.subject, "anne");
-  assert.equal(authenticate("Bearer other"), null);
-  assert.equal(authenticate(undefined), null);
+  assert.equal((await authenticate(`Bearer ${SECRET}`))?.subject, "anne");
+  assert.equal(await authenticate("Bearer other"), null);
+  assert.equal(await authenticate(undefined), null);
 });
 
 test("resolves a fixture end-user token to its subject and rejects others", () => {

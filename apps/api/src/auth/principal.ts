@@ -9,7 +9,10 @@ export interface Principal {
 /** Resolves an end-user token to the verified end-user subject, or null if it is not valid. */
 export type EndUserVerifier = (token: string | undefined) => string | null;
 
-/** Resolves an `Authorization` header to a Principal, or null if it is not valid. */
+/**
+ * Resolves an `Authorization` header to a Principal, or null if it is not valid.
+ * Throws if that could not be determined; the server then fails the request.
+ */
 export type Authenticator = (
   authorization: string | undefined,
-) => Principal | null;
+) => Principal | null | Promise<Principal | null>;

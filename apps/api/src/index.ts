@@ -5,6 +5,8 @@ import pg from "pg";
 import { adminRoutes } from "./admin/routes.js";
 import { createAdminService } from "./admin/service.js";
 import { authenticatorFromEnv, endUserVerifierFromEnv } from "./auth/index.js";
+import { workloadRoutes } from "./auth/workloadRoutes.js";
+import { createBindingStore } from "./auth/workloads.js";
 import { createResolver, dbLookup } from "./checks/resolver.js";
 import { checkRoutes } from "./checks/routes.js";
 import { createCheckService } from "./checks/service.js";
@@ -64,6 +66,7 @@ const checks = checkRoutes({
   verifyEndUser: endUserVerifierFromEnv(process.env),
 });
 const adminHandler = adminRoutes(admin);
+const bindingsHandler = workloadRoutes(createBindingStore(pool));
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
   throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
@@ -79,6 +82,7 @@ createApp({
   }),
   routes: async (req, res, principal, url) =>
     (await adminHandler(req, res, principal, url)) ||
+    (await bindingsHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),
 }).listen(port, "0.0.0.0", () => {
   console.log(JSON.stringify({ msg: "riz api listening", port }));
