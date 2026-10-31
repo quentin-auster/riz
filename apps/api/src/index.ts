@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
+import { relationshipRoutes } from "./admin/relationshipRoutes.js";
+import { createRelationshipService } from "./admin/relationships.js";
 import { adminRoutes } from "./admin/routes.js";
 import { createAdminService } from "./admin/service.js";
 import {
@@ -69,15 +71,16 @@ const maxBatchSize = Number(process.env.RIZ_BATCH_MAX ?? 100);
 if (!Number.isInteger(maxBatchSize) || maxBatchSize < 1 || maxBatchSize > 100) {
   throw new Error("RIZ_BATCH_MAX must be an integer from 1 to 100");
 }
+const resolver = createResolver(dbLookup(pool), required("OPENFGA_API_URL"));
 const checks = checkRoutes({
   maxBatchSize,
-  service: createCheckService({
-    resolver: createResolver(dbLookup(pool), required("OPENFGA_API_URL")),
-    timeoutMs: checkTimeoutMs,
-  }),
+  service: createCheckService({ resolver, timeoutMs: checkTimeoutMs }),
   verifyEndUser,
 });
 const adminHandler = adminRoutes(admin);
+const relationshipsHandler = relationshipRoutes(
+  createRelationshipService({ pool, resolver }),
+);
 const bindingsHandler = workloadRoutes(bindings);
 const readyTimeoutMs = Number(process.env.RIZ_READY_TIMEOUT_MS ?? 1000);
 if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
@@ -94,6 +97,7 @@ createApp({
   }),
   routes: async (req, res, principal, url) =>
     (await adminHandler(req, res, principal, url)) ||
+    (await relationshipsHandler(req, res, principal, url)) ||
     (await bindingsHandler(req, res, principal, url)) ||
     checks(req, res, principal, url),
 }).listen(port, "0.0.0.0", () => {

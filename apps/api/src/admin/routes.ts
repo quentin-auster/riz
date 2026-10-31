@@ -10,17 +10,17 @@ import {
   type PageParams,
 } from "./service.js";
 
-const ID = /^[a-z0-9][a-z0-9-]{0,62}$/;
+export const ID = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const NAME = ID;
 const ENVIRONMENT = /^[a-z0-9]{1,31}$/;
 
-function requireScope(principal: Principal, scope: string) {
+export function requireScope(principal: Principal, scope: string) {
   if (!principal.scopes.includes(scope)) {
     throw new HttpError(403, "forbidden", `Missing scope ${scope}.`);
   }
 }
 
-function pageParams(url: URL): PageParams {
+export function pageParams(url: URL): PageParams {
   const raw = url.searchParams.get("limit");
   const limit = raw === null ? 50 : Number(raw);
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {

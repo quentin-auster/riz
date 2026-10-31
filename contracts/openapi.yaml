@@ -342,7 +342,9 @@ paths:
         - $ref: "#/components/parameters/Application"
         - name: object
           in: query
-          description: Filter by object, `type:id` or `type:`.
+          description: >-
+            Filter by one object, `type:id`. OpenFGA cannot list by type alone.
+            `relation` requires `object`.
           schema:
             type: string
         - name: relation
