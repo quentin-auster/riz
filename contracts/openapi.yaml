@@ -186,6 +186,25 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /v1/me:
+    get:
+      tags: [applications]
+      operationId: getCaller
+      summary: The caller's own scopes and application allow-list
+      description: |
+        Lets a client hide actions the API would refuse. It is a hint only: every
+        request is still authorized on its own. Needs no scope beyond authentication.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The authenticated caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Caller"
+        "401":
+          $ref: "#/components/responses/Error"
   /v1/applications:
     get:
       tags: [applications]
@@ -386,6 +405,11 @@ paths:
       responses:
         "204":
           description: Written.
+          headers:
+            Riz-Audit-Event-Id:
+              description: ID of the audit event recorded for this change.
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -427,6 +451,11 @@ paths:
       responses:
         "204":
           description: Deleted.
+          headers:
+            Riz-Audit-Event-Id:
+              description: ID of the audit event recorded for this change.
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -800,6 +829,21 @@ components:
         createdAt:
           type: string
           format: date-time
+    Caller:
+      type: object
+      required: [subject, scopes, applications]
+      properties:
+        subject:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        applications:
+          type: array
+          description: Application IDs the caller may administer, or `*` for all.
+          items:
+            type: string
     ApplicationList:
       type: object
       required: [items]

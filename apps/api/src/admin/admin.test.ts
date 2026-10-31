@@ -42,6 +42,9 @@ type Call = (
 // Only the fields these tests read; a wrong shape fails the assertion, not the type.
 type Json = {
   id: string;
+  subject?: string;
+  scopes?: string[];
+  applications?: string[];
   nextCursor?: string;
   items: {
     id: string;
@@ -179,6 +182,24 @@ test(
         list.body.items.map((a: { id: string }) => a.id),
         ["crm-prod"],
       );
+    }),
+);
+
+test(
+  "the caller can read its own scopes and allow-list, and no one else's",
+  opts,
+  () =>
+    withApp(async (call) => {
+      const crm = await call("crmOnly", "GET", "/v1/me");
+      assert.equal(crm.status, 200);
+      assert.deepEqual(
+        [crm.body.subject, crm.body.scopes, crm.body.applications],
+        ["crm", ALL, ["crm-prod"]],
+      );
+      // No scope is needed to learn what you may not do.
+      const none = await call("noScope", "GET", "/v1/me");
+      assert.deepEqual(none.body.scopes, []);
+      assert.equal((await call("nobody", "GET", "/v1/me")).status, 401);
     }),
 );
 

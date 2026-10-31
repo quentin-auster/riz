@@ -28,10 +28,11 @@ export interface AuditRecord {
 export async function recordAudit(
   db: Pick<pg.PoolClient, "query">,
   e: AuditEvent,
-): Promise<void> {
-  await db.query(
+): Promise<string> {
+  const { rows } = await db.query(
     `INSERT INTO audit_events (actor, action, application_id, outcome, request_id, detail)
-     VALUES ($1, $2, $3, 'success', $4, $5)`,
+     VALUES ($1, $2, $3, 'success', $4, $5)
+     RETURNING id`,
     [
       e.actor,
       e.action,
@@ -40,6 +41,7 @@ export async function recordAudit(
       e.detail ?? {},
     ],
   );
+  return String(rows[0].id);
 }
 
 export interface AuditFilter {

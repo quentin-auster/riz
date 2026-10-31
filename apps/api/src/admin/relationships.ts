@@ -69,11 +69,11 @@ export function createRelationshipService(deps: {
     detail: Record<string, unknown>,
     requestId: string | undefined,
     mutate: () => Promise<unknown>,
-  ): Promise<void> {
+  ): Promise<string> {
     const db = await pool.connect();
     try {
       await db.query("BEGIN");
-      await recordAudit(db, {
+      const auditEventId = await recordAudit(db, {
         actor,
         action,
         applicationId: application,
@@ -82,6 +82,7 @@ export function createRelationshipService(deps: {
       });
       await mutate();
       await db.query("COMMIT");
+      return auditEventId;
     } catch (err) {
       await db.query("ROLLBACK");
       throw err;
@@ -126,9 +127,9 @@ export function createRelationshipService(deps: {
       application: string,
       relationships: Relationship[],
       requestId?: string,
-    ): Promise<void> {
+    ): Promise<string> {
       const client = await resolver.clientFor(application);
-      await audited(
+      return audited(
         actor,
         application,
         "relationships.write",
@@ -150,9 +151,9 @@ export function createRelationshipService(deps: {
       application: string,
       relationship: Relationship,
       requestId?: string,
-    ): Promise<void> {
+    ): Promise<string> {
       const client = await resolver.clientFor(application);
-      await audited(
+      return audited(
         actor,
         application,
         "relationships.delete",

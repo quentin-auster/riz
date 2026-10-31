@@ -134,12 +134,13 @@ export function relationshipRoutes(service: RelationshipService) {
         const application = applicationOf(body.application);
         const relationships = body.relationships.map(toRelationship);
         permit(principal, application);
-        await service.write(
+        const auditEventId = await service.write(
           principal.subject,
           application,
           relationships,
           requestIdOf(res),
         );
+        res.setHeader("riz-audit-event-id", auditEventId);
         res.statusCode = 204;
         res.end();
       } else if (req.method === "DELETE") {
@@ -151,12 +152,13 @@ export function relationshipRoutes(service: RelationshipService) {
           object: q.get("object"),
         });
         permit(principal, application);
-        await service.remove(
+        const auditEventId = await service.remove(
           principal.subject,
           application,
           relationship,
           requestIdOf(res),
         );
+        res.setHeader("riz-audit-event-id", auditEventId);
         res.statusCode = 204;
         res.end();
       } else {

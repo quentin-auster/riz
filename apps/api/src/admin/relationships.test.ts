@@ -40,7 +40,7 @@ type Call = (
   method: string,
   path: string,
   body?: unknown,
-) => Promise<{ status: number; body: Json }>;
+) => Promise<{ status: number; body: Json; auditEventId: string | null }>;
 
 type Json = {
   nextCursor?: string;
@@ -111,7 +111,11 @@ async function withApp(
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-      return { status: res.status, body: await res.json().catch(() => null) };
+      return {
+        status: res.status,
+        body: await res.json().catch(() => null),
+        auditEventId: res.headers.get("riz-audit-event-id"),
+      };
     };
     await fn({ call, pool, resolver });
   } finally {
@@ -272,11 +276,16 @@ test(
   opts,
   () =>
     withApp(async ({ call, pool }) => {
-      await call("crmAdmin", "POST", "/v1/relationships", write([tuple]));
-      await call("crmAdmin", "DELETE", deletePath());
+      const granted = await call(
+        "crmAdmin",
+        "POST",
+        "/v1/relationships",
+        write([tuple]),
+      );
+      const revoked = await call("crmAdmin", "DELETE", deletePath());
 
       const { rows } = await pool.query(
-        `SELECT actor, action, application_id, request_id, detail
+        `SELECT id::text, actor, action, application_id, request_id, detail
          FROM audit_events WHERE action LIKE 'relationships.%' ORDER BY id`,
       );
       assert.deepEqual(
@@ -287,6 +296,11 @@ test(
         ],
       );
       assert.ok(rows.every((r) => r.request_id));
+      // The response names the exact audit event that recorded the change.
+      assert.deepEqual(
+        [granted.auditEventId, revoked.auditEventId],
+        rows.map((r) => r.id),
+      );
       assert.deepEqual(rows[0].detail, { before: null, after: [tuple] });
       assert.deepEqual(rows[1].detail, { before: tuple, after: null });
     }),
