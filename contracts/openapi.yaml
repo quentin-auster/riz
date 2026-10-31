@@ -186,6 +186,25 @@ paths:
           $ref: "#/components/responses/Error"
         "503":
           $ref: "#/components/responses/Error"
+  /v1/me:
+    get:
+      tags: [applications]
+      operationId: getCaller
+      summary: The caller's own scopes and application allow-list
+      description: |
+        Lets a client hide actions the API would refuse. It is a hint only: every
+        request is still authorized on its own. Needs no scope beyond authentication.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The authenticated caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Caller"
+        "401":
+          $ref: "#/components/responses/Error"
   /v1/applications:
     get:
       tags: [applications]
@@ -386,6 +405,11 @@ paths:
       responses:
         "204":
           description: Written.
+          headers:
+            Riz-Audit-Event-Id:
+              description: ID of the audit event recorded for this change.
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -427,6 +451,11 @@ paths:
       responses:
         "204":
           description: Deleted.
+          headers:
+            Riz-Audit-Event-Id:
+              description: ID of the audit event recorded for this change.
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -505,6 +534,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /v1/models/{modelId}:
+    get:
+      tags: [models]
+      operationId: getModel
+      summary: Read a model this application has been bound to
+      description: |
+        Returns the model as OpenFGA DSL, so versions can be compared. Only a model
+        recorded for this application is readable. Required scope: `models:read`.
+      security:
+        - bearerAuth: [models:read]
+      parameters:
+        - name: modelId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9A-Z]{26}$"
+        - $ref: "#/components/parameters/Application"
+      responses:
+        "200":
+          description: The model.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, model]
+                properties:
+                  id:
+                    type: string
+                  model:
+                    type: string
+                    description: OpenFGA DSL.
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/models/rollback:
     post:
       tags: [models]
@@ -539,6 +608,41 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /v1/explorer/check:
+    post:
+      tags: [explorer]
+      operationId: explorerCheck
+      summary: Check a permission on behalf of another principal
+      description: |
+        Answers "can `principal` hold `relation` on `object` in `application`?" for
+        administrators. Unlike `/v1/check`, the caller names the principal, so this has its
+        own scope and the caller's application allow-list applies. Every answered query
+        is audited (`explorer.check`); if the audit event cannot be recorded, no answer is
+        returned. Refused or invalid requests are not audited.
+        Required scope: `explorer:check`.
+      security:
+        - bearerAuth: [explorer:check]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplorerCheckRequest"
+      responses:
+        "200":
+          description: Decision, with the model that produced it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/audit:
     get:
       tags: [audit]
@@ -555,6 +659,18 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/ApplicationId"
+        - name: actor
+          in: query
+          description: Exact match on the subject that made the change.
+          schema:
+            type: string
+            maxLength: 128
+        - name: action
+          in: query
+          description: Exact match, for example `models.rollback`.
+          schema:
+            type: string
+            maxLength: 128
         - name: from
           in: query
           schema:
@@ -623,8 +739,9 @@ components:
       description: |
         Workload credential. Scopes: `check`, `applications:read`,
         `applications:write`, `relationships:read`, `relationships:write`,
-        `models:read`, `models:write`, `audit:read`. Check scopes are separate from administrative
-        mutation scopes.
+        `models:read`, `models:write`, `audit:read`, `explorer:check`. Check scopes are separate
+        from administrative mutation scopes, and `explorer:check` (checking as another principal)
+        is separate from `check`.
     endUserToken:
       type: apiKey
       in: header
@@ -703,6 +820,23 @@ components:
       properties:
         application:
           $ref: "#/components/schemas/ApplicationId"
+        relation:
+          type: string
+          examples: [read]
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+    ExplorerCheckRequest:
+      type: object
+      additionalProperties: false
+      required: [application, principal, relation, object]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        principal:
+          type: string
+          description: The end-user ID to check, as `user:<principal>`.
+          pattern: "^[A-Za-z0-9._@+-]{1,128}$"
+          examples: [anne]
         relation:
           type: string
           examples: [read]
@@ -800,6 +934,21 @@ components:
         createdAt:
           type: string
           format: date-time
+    Caller:
+      type: object
+      required: [subject, scopes, applications]
+      properties:
+        subject:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        applications:
+          type: array
+          description: Application IDs the caller may administer, or `*` for all.
+          items:
+            type: string
     ApplicationList:
       type: object
       required: [items]

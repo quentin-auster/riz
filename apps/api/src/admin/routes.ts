@@ -47,7 +47,21 @@ function auditFilter(url: URL): AuditFilter {
   if (application !== undefined && !ID.test(application)) {
     throw new HttpError(400, "invalid_request", "Invalid application.");
   }
-  return { application, from: date("from"), to: date("to") };
+  const text = (name: string): string | undefined => {
+    const raw = url.searchParams.get(name);
+    if (raw === null) return undefined;
+    if (raw === "" || raw.length > 128) {
+      throw new HttpError(400, "invalid_request", `Invalid ${name}.`);
+    }
+    return raw;
+  };
+  return {
+    application,
+    actor: text("actor"),
+    action: text("action"),
+    from: date("from"),
+    to: date("to"),
+  };
 }
 
 function createBody(body: unknown): { name: string; environment: string } {
@@ -94,7 +108,12 @@ export function adminRoutes(service: AdminService) {
     const { pathname } = url;
     const byId = /^\/v1\/applications\/([^/]+)$/.exec(pathname)?.[1];
     try {
-      if (pathname === "/v1/applications" && req.method === "POST") {
+      if (pathname === "/v1/me" && req.method === "GET") {
+        // The caller's own authority, so a client can hide what the API would refuse.
+        // It is a hint: every request is still authorized by the API.
+        const { subject, scopes, applications } = principal;
+        send(res, 200, { subject, scopes, applications });
+      } else if (pathname === "/v1/applications" && req.method === "POST") {
         requireScope(principal, "applications:write");
         // Registration can reveal whether an ID is taken, so it is for platform administrators.
         if (!principal.applications.includes("*")) {

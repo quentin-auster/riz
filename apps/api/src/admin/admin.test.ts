@@ -42,6 +42,9 @@ type Call = (
 // Only the fields these tests read; a wrong shape fails the assertion, not the type.
 type Json = {
   id: string;
+  subject?: string;
+  scopes?: string[];
+  applications?: string[];
   nextCursor?: string;
   items: {
     id: string;
@@ -182,6 +185,24 @@ test(
     }),
 );
 
+test(
+  "the caller can read its own scopes and allow-list, and no one else's",
+  opts,
+  () =>
+    withApp(async (call) => {
+      const crm = await call("crmOnly", "GET", "/v1/me");
+      assert.equal(crm.status, 200);
+      assert.deepEqual(
+        [crm.body.subject, crm.body.scopes, crm.body.applications],
+        ["crm", ALL, ["crm-prod"]],
+      );
+      // No scope is needed to learn what you may not do.
+      const none = await call("noScope", "GET", "/v1/me");
+      assert.deepEqual(none.body.scopes, []);
+      assert.equal((await call("nobody", "GET", "/v1/me")).status, 401);
+    }),
+);
+
 test("lists the active model for an application", opts, () =>
   withApp(async (call) => {
     await call("admin", "POST", "/v1/applications", {
@@ -287,6 +308,41 @@ test(
       assert.notEqual(second.body.items[0]?.id, first.body.items[0]?.id);
       assert.equal(
         (await call("admin", "GET", "/v1/audit?cursor=nope")).status,
+        400,
+      );
+    }),
+);
+
+test(
+  "audit events can be filtered by actor and action, within the allow-list",
+  opts,
+  () =>
+    withApp(async (call) => {
+      for (const name of ["crm", "hr"]) {
+        await call("admin", "POST", "/v1/applications", {
+          name,
+          environment: "prod",
+        });
+      }
+      const events = async (who: string, query: string) =>
+        (await call(who, "GET", `/v1/audit?${query}`)).body.items;
+
+      assert.equal(
+        (await events("admin", "action=applications.create")).length,
+        2,
+      );
+      assert.equal((await events("admin", "action=models.rollback")).length, 0);
+      assert.equal((await events("admin", "actor=admin")).length, 2);
+      assert.equal((await events("admin", "actor=someone-else")).length, 0);
+      // A filter never widens what the caller may see.
+      assert.deepEqual(
+        (await events("crmOnly", "action=applications.create")).map(
+          (e) => e.application,
+        ),
+        ["crm-prod"],
+      );
+      assert.equal(
+        (await call("admin", "GET", "/v1/audit?actor=")).status,
         400,
       );
     }),

@@ -39,6 +39,11 @@ const principals: Record<string, Principal> = {
     applications: ["hr-prod"],
   },
   noScope: { subject: "ns", scopes: ["models:read"], applications: ["*"] },
+  crmReader: {
+    subject: "crm-reader",
+    scopes: ["models:read"],
+    applications: ["crm-prod"],
+  },
 };
 
 const base = readFileSync(
@@ -91,6 +96,7 @@ type Call = (
 async function withApp(
   fn: (ctx: {
     call: Call;
+    get: (token: string, path: string) => ReturnType<Call>;
     pool: pg.Pool;
     activeModel: (application: string) => Promise<string>;
     bobCanRead: (application: string) => Promise<boolean>;
@@ -143,6 +149,12 @@ async function withApp(
       });
       return { status: res.status, body: await res.json().catch(() => null) };
     };
+    const get = async (token: string, path: string) => {
+      const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      return { status: res.status, body: await res.json().catch(() => null) };
+    };
     const activeModel = async (application: string) =>
       (
         await pool.query(
@@ -169,7 +181,7 @@ async function withApp(
         })),
       });
     };
-    await fn({ call, pool, activeModel, bobCanRead, seed });
+    await fn({ call, get, pool, activeModel, bobCanRead, seed });
   } finally {
     server.close();
     await pool.end();
@@ -365,4 +377,52 @@ test("a binding whose audit write fails is not changed", opts, () =>
     assert.equal(await activeModel("crm-prod"), before);
     assert.equal(await bobCanRead("crm-prod"), true);
   }),
+);
+
+test(
+  "a bound model can be read as DSL, so versions can be compared",
+  opts,
+  () =>
+    withApp(async ({ call, get, activeModel }) => {
+      const first = await activeModel("crm-prod");
+      const second = (
+        await call("crmAdmin", "/v1/models", submit(tight, false))
+      ).body?.id as string;
+
+      const older = await get(
+        "crmReader",
+        `/v1/models/${first}?application=crm-prod`,
+      );
+      const newer = await get(
+        "crmReader",
+        `/v1/models/${second}?application=crm-prod`,
+      );
+      assert.equal(older.status, 200);
+      assert.equal(newer.status, 200);
+      assert.match(older.body?.model as string, /or member from team/);
+      assert.doesNotMatch(newer.body?.model as string, /or member from team/);
+    }),
+);
+
+test(
+  "a model cannot be read without models:read, outside the allow-list, or through another application",
+  opts,
+  () =>
+    withApp(async ({ get, activeModel }) => {
+      const crm = await activeModel("crm-prod");
+      const hr = await activeModel("hr-prod");
+      const path = (id: string, application: string) =>
+        `/v1/models/${id}?application=${application}`;
+
+      // models:write alone does not read; another application's admin is refused.
+      assert.equal((await get("crmAdmin", path(crm, "crm-prod"))).status, 403);
+      assert.equal((await get("crmReader", path(hr, "hr-prod"))).status, 403);
+      // A model of one application is not readable under another.
+      assert.equal((await get("noScope", path(crm, "hr-prod"))).status, 404);
+      assert.equal(
+        (await get("noScope", `/v1/models/${crm}?application=nope-prod`))
+          .status,
+        404,
+      );
+    }),
 );
