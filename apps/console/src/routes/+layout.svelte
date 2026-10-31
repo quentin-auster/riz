@@ -8,6 +8,7 @@
     <nav>
       <a href="/">Home</a>
       <a href="/applications">Applications</a>
+      <a href="/explorer">Explorer</a>
     </nav>
     <form method="POST" action="/logout">
       <span>{data.subject}</span>

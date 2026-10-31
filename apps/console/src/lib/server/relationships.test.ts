@@ -26,7 +26,7 @@ test("apiMutation returns the audit event id the API put in the header", async (
     { method: "POST", body: {} },
     fetchImpl,
   );
-  assert.deepEqual(result, { auditEventId: "evt-1" });
+  assert.deepEqual(result, { auditEventId: "evt-1", body: undefined });
 });
 
 test("apiMutation throws the API's refusal when a non-admin is forbidden", async () => {

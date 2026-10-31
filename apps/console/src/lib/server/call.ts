@@ -33,7 +33,7 @@ export async function mutate(
   path: string,
   init: { method: string; body?: unknown },
 ): Promise<
-  | { ok: true; auditEventId: string | null }
+  | { ok: true; auditEventId: string | null; body: unknown }
   | { ok: false; status: number; message: string }
 > {
   if (!locals.session) redirect(303, "/login");

@@ -568,6 +568,40 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /v1/explorer/check:
+    post:
+      tags: [explorer]
+      operationId: explorerCheck
+      summary: Check a permission on behalf of another principal
+      description: |
+        Answers "can `principal` hold `relation` on `object` in `application`?" for
+        administrators. Unlike `/v1/check`, the caller names the principal, so this has its
+        own scope and the caller's application allow-list applies. Every query is audited
+        (`explorer.check`); if the audit event cannot be recorded, no answer is returned.
+        Required scope: `explorer:check`.
+      security:
+        - bearerAuth: [explorer:check]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExplorerCheckRequest"
+      responses:
+        "200":
+          description: Decision, with the model that produced it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /v1/audit:
     get:
       tags: [audit]
@@ -652,8 +686,9 @@ components:
       description: |
         Workload credential. Scopes: `check`, `applications:read`,
         `applications:write`, `relationships:read`, `relationships:write`,
-        `models:read`, `models:write`, `audit:read`. Check scopes are separate from administrative
-        mutation scopes.
+        `models:read`, `models:write`, `audit:read`, `explorer:check`. Check scopes are separate
+        from administrative mutation scopes, and `explorer:check` (checking as another principal)
+        is separate from `check`.
     endUserToken:
       type: apiKey
       in: header
@@ -732,6 +767,23 @@ components:
       properties:
         application:
           $ref: "#/components/schemas/ApplicationId"
+        relation:
+          type: string
+          examples: [read]
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+    ExplorerCheckRequest:
+      type: object
+      additionalProperties: false
+      required: [application, principal, relation, object]
+      properties:
+        application:
+          $ref: "#/components/schemas/ApplicationId"
+        principal:
+          type: string
+          description: The end-user ID to check, as `user:<principal>`.
+          pattern: "^[A-Za-z0-9._@+-]{1,128}$"
+          examples: [anne]
         relation:
           type: string
           examples: [read]

@@ -46,19 +46,22 @@ export async function apiJson<T>(
   return json as T;
 }
 
-/** A change made through the API, with the audit event the API recorded for it. */
+/**
+ * A POST or DELETE made through the API: the response body (undefined for 204) and the
+ * audit event the API recorded for it.
+ */
 export async function apiMutation(
   apiUrl: string,
   session: Session,
   path: string,
   init: { method: string; body?: unknown },
   fetchImpl: typeof fetch = fetch,
-): Promise<{ auditEventId: string | null }> {
+): Promise<{ auditEventId: string | null; body: unknown }> {
   let auditEventId: string | null = null;
-  await apiJson(apiUrl, session, path, init, async (url, opts) => {
+  const body = await apiJson(apiUrl, session, path, init, async (url, opts) => {
     const res = await fetchImpl(url, opts);
     auditEventId = res.headers.get("riz-audit-event-id");
     return res;
   });
-  return { auditEventId };
+  return { auditEventId, body };
 }
