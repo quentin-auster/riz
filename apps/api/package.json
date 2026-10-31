@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/run-migrate.ts",
     "test": "tsx --test src/*.test.ts src/*/*.test.ts",
-    "test:integration": "tsx --test tests/integration/*.test.ts"
+    "test:integration": "tsx --test tests/integration/*.test.ts",
+    "test:replicas": "tsx --test ../../tests/load/equivalence.test.ts"
   },
   "devDependencies": {
     "@types/node": "22.18.10",

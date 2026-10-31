@@ -63,6 +63,26 @@ jobs:
       - if: failure()
         run: docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api openfga
 
+  replicas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: cp .env.example .env
+      - run: docker compose --env-file .env -f deploy/compose.yaml --profile replicas up -d --build --wait lb
+      - run: curl -sf --retry 30 --retry-all-errors --retry-delay 1 http://localhost:8090/health/ready
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @riz/api test:replicas
+        env:
+          RIZ_LB_URL: http://localhost:8090
+          RIZ_REPLICAS: "2"
+      - if: failure()
+        run: docker compose --env-file .env -f deploy/compose.yaml --profile replicas logs --tail 50 api-replica lb
+
   model:
     runs-on: ubuntu-latest
     steps:
