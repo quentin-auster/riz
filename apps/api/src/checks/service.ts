@@ -3,6 +3,7 @@ import {
   FgaApiValidationError,
   type OpenFgaClient,
 } from "@openfga/sdk";
+import { observeOpenFga, traceHeaders } from "../observability.js";
 import {
   ApplicationNotFound,
   type createResolver,
@@ -54,6 +55,7 @@ export function createCheckService(deps: {
    */
   async function guarded<T>(
     applicationId: string,
+    operation: "check" | "batch_check",
     call: (client: OpenFgaClient, modelId: string) => Promise<T>,
     fail: (code: IndeterminateCode) => T,
   ): Promise<T> {
@@ -71,13 +73,15 @@ export function createCheckService(deps: {
     try {
       // shortcut: on timeout the OpenFGA request is abandoned, not cancelled
       // (the SDK takes no abort signal); upgrade if abandoned calls pile up.
-      return await Promise.race([
-        // clientFor always pins a model ID.
-        call(client, client.authorizationModelId as string),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Timeout()), timeoutMs);
-        }),
-      ]);
+      return await observeOpenFga(operation, () =>
+        Promise.race([
+          // clientFor always pins a model ID.
+          call(client, client.authorizationModelId as string),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Timeout()), timeoutMs);
+          }),
+        ]),
+      );
     } catch (err) {
       if (err instanceof FgaApiValidationError) throw new InvalidCheck();
       return fail(err instanceof Timeout ? "timeout" : "backend_error");
@@ -88,6 +92,7 @@ export function createCheckService(deps: {
 
   const requestOptions = (consistency: Consistency | undefined) => ({
     retryParams: { maxRetry: 0 },
+    headers: traceHeaders(),
     ...(consistency === undefined
       ? {}
       : {
@@ -110,6 +115,7 @@ export function createCheckService(deps: {
     ): Promise<CheckResult> {
       return guarded<CheckResult>(
         applicationId,
+        "check",
         async (client, modelId) => {
           const { allowed } = await client.check(
             {
@@ -140,6 +146,7 @@ export function createCheckService(deps: {
       });
       return guarded<BatchResult>(
         applicationId,
+        "batch_check",
         async (client, modelId) => {
           const { result } = await client.batchCheck(
             {

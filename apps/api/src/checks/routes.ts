@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EndUserVerifier, Principal } from "../auth/index.js";
 import { HttpError, readJson, requestIdOf, send } from "../http.js";
+import { recordBatchSize, recordDecisions } from "../observability.js";
 import { ApplicationNotFound } from "./resolver.js";
 import {
   type BatchItem,
@@ -182,16 +183,25 @@ export function checkRoutes(deps: {
           deps.maxBatchSize,
         );
         permit(application);
-        result = await deps.service.batch(
+        recordBatchSize(items.length);
+        const batch = await deps.service.batch(
           application,
           endUser,
           items,
           consistency,
         );
+        recordDecisions(batch.results.map((r) => r.status));
+        result = batch;
       } else {
         const input = checkBody(body);
         permit(input.application);
-        result = await deps.service.check(input.application, endUser, input);
+        const single = await deps.service.check(
+          input.application,
+          endUser,
+          input,
+        );
+        recordDecisions([single.status]);
+        result = single;
       }
       send(res, 200, { ...result, requestId: requestIdOf(res) });
     } catch (err) {

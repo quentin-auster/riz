@@ -21,6 +21,7 @@ import { checkRoutes } from "./checks/routes.js";
 import { createCheckService } from "./checks/service.js";
 import { migrate } from "./db/migrate.js";
 import { readiness } from "./health.js";
+import { setupObservability } from "./observability.js";
 import { providerRoutes } from "./providers/routes.js";
 import { createProviderService } from "./providers/service.js";
 import { createApp } from "./server.js";
@@ -30,6 +31,8 @@ function required(name: string): string {
   if (!value) throw new Error(`${name} is required`);
   return value;
 }
+
+setupObservability(process.env);
 
 const pool = new pg.Pool({
   connectionString: required("RIZ_DATABASE_URL"),

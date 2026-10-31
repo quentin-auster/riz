@@ -13,6 +13,7 @@ import {
   sendError,
 } from "./http.js";
 import { type Log, stdoutLog } from "./logging.js";
+import { observeRequest } from "./observability.js";
 
 type Routes = (
   req: IncomingMessage,
@@ -81,12 +82,14 @@ export function createApp(opts: {
       });
     });
 
-    handle(req, res).catch((err) => {
-      if (res.headersSent) return;
-      if (err instanceof HttpError) return sendError(res, err);
-      // Fail closed without leaking internals; log the error type only.
-      log({ msg: "unhandled error", requestId, error: String(err?.name) });
-      sendError(res, new HttpError(500, "internal", "Internal error."));
+    observeRequest(req, res, { requestId, path: path ?? "/" }, () => {
+      handle(req, res).catch((err) => {
+        if (res.headersSent) return;
+        if (err instanceof HttpError) return sendError(res, err);
+        // Fail closed without leaking internals; log the error type only.
+        log({ msg: "unhandled error", requestId, error: String(err?.name) });
+        sendError(res, new HttpError(500, "internal", "Internal error."));
+      });
     });
   });
 }
