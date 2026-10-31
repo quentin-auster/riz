@@ -5,7 +5,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { OpenFgaClient } from "@openfga/sdk";
+import { ConsistencyPreference, OpenFgaClient } from "@openfga/sdk";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
 import { adminRoutes } from "../admin/routes.js";
@@ -59,6 +59,8 @@ async function withApp(
   fn: (ctx: {
     admin: Call;
     callWith: (openfgaUrl: string, timeoutMs: number) => Promise<Call>;
+    /** Removes alice's read access to document:d1. */
+    revokeAlice: () => Promise<void>;
   }) => Promise<void>,
 ) {
   const schema = `t_${randomUUID().replaceAll("-", "")}`;
@@ -138,18 +140,29 @@ async function withApp(
       dbLookup(pool),
       apiUrl as string,
     ).resolve("crm-prod");
-    await new OpenFgaClient({
+    const fga = new OpenFgaClient({
       apiUrl: apiUrl as string,
       storeId: binding.storeId,
       authorizationModelId: binding.modelId,
-    }).write({
+    });
+    await fga.write({
       writes: [
         { user: "project:p1", relation: "project", object: "document:d1" },
         { user: "user:alice", relation: "viewer", object: "project:p1" },
       ],
     });
 
-    await fn({ admin, callWith: serve });
+    await fn({
+      admin,
+      callWith: serve,
+      revokeAlice: async () => {
+        await fga.write({
+          deletes: [
+            { user: "user:alice", relation: "viewer", object: "project:p1" },
+          ],
+        });
+      },
+    });
   } finally {
     for (const s of servers) s.close();
     await pool.end();
@@ -347,6 +360,147 @@ test(
         { correlationId: "x", status: "allow" },
       ]);
     }),
+);
+
+/** A fake OpenFGA that allows everything and records the `consistency` it was sent. */
+async function stubRecordingConsistency() {
+  const seen: unknown[] = [];
+  const server = createServer(async (req, res) => {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    const body = JSON.parse(raw) as {
+      consistency?: unknown;
+      checks?: { correlation_id: string }[];
+    };
+    seen.push(body.consistency);
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify(
+        body.checks
+          ? {
+              result: Object.fromEntries(
+                body.checks.map((c) => [c.correlation_id, { allowed: true }]),
+              ),
+            }
+          : { allowed: true },
+      ),
+    );
+  });
+  const port = await listen(server);
+  return {
+    seen,
+    url: `http://127.0.0.1:${port}`,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
+}
+
+test(
+  "passes the requested consistency to OpenFGA for check and batch, and none by default",
+  opts,
+  () =>
+    withApp(async ({ callWith }) => {
+      const upstream = await stubRecordingConsistency();
+      try {
+        const call = await callWith(upstream.url, 2000);
+        const batch = [item("a", "read", "document:d1")];
+        for (const consistency of [
+          undefined,
+          "minimize_latency",
+          "higher_consistency",
+        ]) {
+          const extra = consistency === undefined ? {} : { consistency };
+          assert.equal(
+            (await call("admin", { ...read, ...extra }, "alice-token")).status,
+            200,
+          );
+          assert.equal(
+            (
+              await call(
+                "admin",
+                { application: "crm-prod", checks: batch, ...extra },
+                "alice-token",
+                BATCH,
+              )
+            ).status,
+            200,
+          );
+        }
+        assert.deepEqual(upstream.seen, [
+          undefined,
+          undefined,
+          ConsistencyPreference.MinimizeLatency,
+          ConsistencyPreference.MinimizeLatency,
+          ConsistencyPreference.HigherConsistency,
+          ConsistencyPreference.HigherConsistency,
+        ]);
+      } finally {
+        upstream.close();
+      }
+    }),
+);
+
+test(
+  "higher_consistency denies a user whose access was just revoked",
+  opts,
+  () =>
+    withApp(async ({ admin, revokeAlice }) => {
+      const batch = {
+        application: "crm-prod",
+        checks: [item("x", "read", "document:d1")],
+        consistency: "higher_consistency",
+      };
+      assert.equal(
+        (
+          await admin(
+            "admin",
+            { ...read, consistency: "higher_consistency" },
+            "alice-token",
+          )
+        ).body.status,
+        "allow",
+      );
+
+      await revokeAlice();
+
+      const single = await admin(
+        "admin",
+        { ...read, consistency: "higher_consistency" },
+        "alice-token",
+      );
+      assert.equal(single.body.status, "deny");
+      const many = await admin("admin", batch, "alice-token", BATCH);
+      assert.deepEqual(many.body.results, [
+        { correlationId: "x", status: "deny" },
+      ]);
+    }),
+);
+
+test("an unknown consistency value is a 400 for check and batch", opts, () =>
+  withApp(async ({ admin }) => {
+    for (const consistency of ["eventual", "", 1, null]) {
+      const single = await admin(
+        "admin",
+        { ...read, consistency },
+        "alice-token",
+      );
+      assert.equal(single.status, 400, JSON.stringify(consistency));
+      assert.equal(single.body.code, "invalid_request");
+      const many = await admin(
+        "admin",
+        {
+          application: "crm-prod",
+          checks: [item("x", "read", "document:d1")],
+          consistency,
+        },
+        "alice-token",
+        BATCH,
+      );
+      assert.equal(many.status, 400, JSON.stringify(consistency));
+    }
+  }),
 );
 
 test(

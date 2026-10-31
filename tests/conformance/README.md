@@ -22,7 +22,7 @@ One JSON file per case. Every case uses application `crm`, bearer token
 | --- | --- |
 | `name` | The behavior under test. |
 | `client.timeoutMs` | Optional timeout override. |
-| `call` | `operation` (`check` or `batchCheck`), `endUserToken`, and `action` + `resource` or `checks`. A check with `count: n` stands for n copies. |
+| `call` | `operation` (`check` or `batchCheck`), `endUserToken`, optionally `consistency`, and `action` + `resource` or `checks`. A check with `count: n` stands for n copies. |
 | `expectRequest` | `method`, `path` and optionally `body` the server must receive. Omitted means the body is not asserted. |
 | `response` | What the server sends: `status`, `headers`, `body` (a string is sent as is), `delayMs` before answering, or `drop: true` to close the connection. |
 | `nonconformingResponse` | `true` when the response deliberately breaks the contract, to test how an SDK treats a misbehaving server. The contract test requires such a response to really fail validation. |

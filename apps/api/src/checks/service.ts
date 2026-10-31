@@ -1,9 +1,16 @@
-import { FgaApiValidationError, type OpenFgaClient } from "@openfga/sdk";
+import {
+  ConsistencyPreference,
+  FgaApiValidationError,
+  type OpenFgaClient,
+} from "@openfga/sdk";
 import {
   ApplicationNotFound,
   type createResolver,
   NoActiveModel,
 } from "./resolver.js";
+
+/** Absent means OpenFGA's own default, which is `minimize_latency`. */
+export type Consistency = "minimize_latency" | "higher_consistency";
 
 export type Decision = "allow" | "deny" | "indeterminate";
 export type IndeterminateCode = "timeout" | "backend_error" | "no_active_model";
@@ -79,13 +86,27 @@ export function createCheckService(deps: {
     }
   }
 
-  const noRetry = { retryParams: { maxRetry: 0 } };
+  const requestOptions = (consistency: Consistency | undefined) => ({
+    retryParams: { maxRetry: 0 },
+    ...(consistency === undefined
+      ? {}
+      : {
+          consistency:
+            consistency === "higher_consistency"
+              ? ConsistencyPreference.HigherConsistency
+              : ConsistencyPreference.MinimizeLatency,
+        }),
+  });
 
   return {
     check(
       applicationId: string,
       endUser: string,
-      input: { relation: string; object: string },
+      input: {
+        relation: string;
+        object: string;
+        consistency?: Consistency | undefined;
+      },
     ): Promise<CheckResult> {
       return guarded<CheckResult>(
         applicationId,
@@ -96,7 +117,7 @@ export function createCheckService(deps: {
               relation: input.relation,
               object: input.object,
             },
-            noRetry,
+            requestOptions(input.consistency),
           );
           return { status: allowed === true ? "allow" : "deny", modelId };
         },
@@ -109,6 +130,7 @@ export function createCheckService(deps: {
       applicationId: string,
       endUser: string,
       items: BatchItem[],
+      consistency?: Consistency,
     ): Promise<BatchResult> {
       const allIndeterminate = (): BatchResult => ({
         results: items.map((i) => ({
@@ -128,7 +150,7 @@ export function createCheckService(deps: {
                 correlationId: i.correlationId,
               })),
             },
-            noRetry,
+            requestOptions(consistency),
           );
           const byId = new Map(result.map((r) => [r.correlationId, r]));
           return {

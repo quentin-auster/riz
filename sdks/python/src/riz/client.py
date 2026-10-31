@@ -55,6 +55,9 @@ class Check:
     resource: str
 
 
+Consistency = Literal["minimize_latency", "higher_consistency"]
+
+
 @dataclass(frozen=True)
 class Decision:
     """`allowed` is true only for `allow`; an undecidable check raises instead."""
@@ -144,16 +147,28 @@ class Riz:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def check(self, *, action: str, resource: str, end_user_token: str) -> Decision:
+    async def check(
+        self,
+        *,
+        action: str,
+        resource: str,
+        end_user_token: str,
+        consistency: Consistency | None = None,
+    ) -> Decision:
         """Whether the end user holds `action` on `resource`.
 
+        `consistency="higher_consistency"` sees revocations already committed, at more cost;
+        unset uses riz's default, `minimize_latency`, which may serve a briefly cached answer.
         Raises RizIndeterminateError when riz cannot decide; never returns allow then.
         """
-        body = await self._post(
-            "/v1/check",
-            end_user_token,
-            {"application": self._application, "relation": action, "object": resource},
-        )
+        payload: dict[str, object] = {
+            "application": self._application,
+            "relation": action,
+            "object": resource,
+        }
+        if consistency is not None:
+            payload["consistency"] = consistency
+        body = await self._post("/v1/check", end_user_token, payload)
         status = _str(body.get("status"))
         request_id = _str(body.get("requestId"))
         if status is None or request_id is None:
@@ -168,19 +183,27 @@ class Riz:
             model_id=_str(body.get("modelId")),
         )
 
-    async def batch_check(self, checks: Sequence[Check], *, end_user_token: str) -> BatchDecision:
-        """At most 100 checks (riz may allow fewer). An indeterminate item does not affect the rest."""
-        body = await self._post(
-            "/v1/batch-check",
-            end_user_token,
-            {
-                "application": self._application,
-                "checks": [
-                    {"correlationId": str(i), "relation": c.action, "object": c.resource}
-                    for i, c in enumerate(checks)
-                ],
-            },
-        )
+    async def batch_check(
+        self,
+        checks: Sequence[Check],
+        *,
+        end_user_token: str,
+        consistency: Consistency | None = None,
+    ) -> BatchDecision:
+        """At most 100 checks (riz may allow fewer). An indeterminate item does not affect the rest.
+
+        `consistency` applies to every check in the batch, as in `check`.
+        """
+        payload: dict[str, object] = {
+            "application": self._application,
+            "checks": [
+                {"correlationId": str(i), "relation": c.action, "object": c.resource}
+                for i, c in enumerate(checks)
+            ],
+        }
+        if consistency is not None:
+            payload["consistency"] = consistency
+        body = await self._post("/v1/batch-check", end_user_token, payload)
         request_id = _str(body.get("requestId"))
         results = body.get("results")
         if request_id is None or not isinstance(results, list):

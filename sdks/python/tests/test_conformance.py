@@ -93,19 +93,23 @@ def _serve(case: dict[str, Any]) -> tuple[ThreadingHTTPServer, list[dict[str, An
 async def _invoke(case: dict[str, Any], base_url: str) -> object:
     call = case["call"]
     timeout = case.get("client", {}).get("timeoutMs", 2000) / 1000
+    consistency = call.get("consistency")
     async with Riz(base_url, BEARER, "crm", timeout=timeout) as riz:
         if call["operation"] == "check":
             return await riz.check(
                 action=call["action"],
                 resource=call["resource"],
                 end_user_token=call["endUserToken"],
+                consistency=consistency,
             )
         checks = [
             Check(c["action"], c["resource"])
             for c in call["checks"]
             for _ in range(c.get("count", 1))
         ]
-        return await riz.batch_check(checks, end_user_token=call["endUserToken"])
+        return await riz.batch_check(
+            checks, end_user_token=call["endUserToken"], consistency=consistency
+        )
 
 
 @pytest.mark.parametrize("path", CASES, ids=lambda p: json.loads(p.read_text())["name"])

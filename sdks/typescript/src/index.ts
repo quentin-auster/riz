@@ -12,6 +12,12 @@ export interface Check {
   resource: string;
 }
 
+/**
+ * `higher_consistency` sees revocations already committed, at more cost. Unset uses
+ * riz's default, `minimize_latency`, which may serve a briefly cached answer.
+ */
+export type Consistency = "minimize_latency" | "higher_consistency";
+
 /** `allowed` is true only for `allow`; an undecidable check raises instead. */
 export interface Decision {
   allowed: boolean;
@@ -136,11 +142,16 @@ export class Riz {
    * Whether `endUserToken`'s user holds `action` on `resource`. Raises
    * RizIndeterminateError when riz cannot decide; never resolves to allow then.
    */
-  async check(input: Check & { endUserToken: string }): Promise<Decision> {
+  async check(
+    input: Check & { endUserToken: string; consistency?: Consistency },
+  ): Promise<Decision> {
     const body = await this.#post("/v1/check", input.endUserToken, {
       application: this.#application,
       relation: input.action,
       object: input.resource,
+      ...(input.consistency === undefined
+        ? {}
+        : { consistency: input.consistency }),
     });
     const status = str(body.status);
     const requestId = str(body.requestId);
@@ -163,7 +174,7 @@ export class Riz {
   /** At most 100 checks (riz may allow fewer). One item being indeterminate does not affect the rest. */
   async batchCheck(
     checks: readonly Check[],
-    options: { endUserToken: string },
+    options: { endUserToken: string; consistency?: Consistency },
   ): Promise<BatchDecision> {
     const body = await this.#post("/v1/batch-check", options.endUserToken, {
       application: this.#application,
@@ -172,6 +183,9 @@ export class Riz {
         relation: c.action,
         object: c.resource,
       })),
+      ...(options.consistency === undefined
+        ? {}
+        : { consistency: options.consistency }),
     });
     const requestId = str(body.requestId);
     if (requestId === undefined || !Array.isArray(body.results)) {
