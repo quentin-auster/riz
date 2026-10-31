@@ -4,6 +4,16 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./databricks": {
+      "types": "./dist/databricks.d.ts",
+      "default": "./dist/databricks.js"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -11,7 +21,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/*.test.ts",
-    "test:integration": "tsx --test tests/integration.test.ts"
+    "test:integration": "tsx --test tests/integration.test.ts",
+    "test:databricks": "tsx --test tests/databricks.test.ts"
   },
   "devDependencies": {
     "@types/node": "22.18.10",
