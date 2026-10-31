@@ -28,8 +28,10 @@ one with `SELECT` on the table and one without. Do not use production data.
 1. Start riz (`make up`) and register an application. Bind `report:sales` for the
    application with a `read` relationship for the first user (and, to see the
    "riz allows, Databricks denies" case, for the second).
-2. Store the workspace settings with `PUT /v1/providers/databricks`
-   (`{"application": ..., "config": {"workspaceHost": ..., "warehouseId": ...}}`).
+2. Optionally store the workspace settings with `PUT /v1/providers/databricks`
+   (`{"application": ..., "config": {"workspaceHost": ..., "warehouseId": ...}}`). The
+   example does not read them back: it takes the host and warehouse from the environment
+   variables in step 4, and no SDK method fetches the stored settings yet.
 3. Point `REPORTS["sales"]` in `app.py` at your table.
 4. Get a user token for each user (OAuth U2M, for example `databricks auth token`) and run:
 

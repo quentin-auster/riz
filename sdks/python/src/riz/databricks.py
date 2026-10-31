@@ -15,8 +15,9 @@ from riz.client import RizError
 # Databricks Apps forwards the signed-in user's token in this header.
 FORWARDED_TOKEN_HEADER = "x-forwarded-access-token"
 
-# The same shape the riz API accepts: a bare lower-case host. Anything else could send the
-# user's token somewhere other than a Databricks workspace.
+# The same shape the riz API accepts: a bare lower-case host, so no scheme, port, path or
+# userinfo rides along. shortcut: any DNS name passes, so the caller must trust where the
+# host comes from; restrict to Databricks suffixes or an allow-list if it is ever untrusted.
 _HOST = re.compile(
     r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
 )
@@ -133,10 +134,13 @@ class Databricks:
                 headers={"authorization": f"Bearer {user_token}"},
             )
         except httpx.HTTPError as e:
-            # No chained cause: it can quote a header value, i.e. the user's token.
-            raise DatabricksError(
-                0, None, f"could not reach Databricks ({type(e).__name__})"
-            ) from None
+            unreachable: str | None = type(e).__name__
+        else:
+            unreachable = None
+        if unreachable is not None:
+            # Raised outside the except block so the httpx error, which can quote a header
+            # value (the user's token), is not left on __context__.
+            raise DatabricksError(0, None, f"could not reach Databricks ({unreachable})")
         try:
             body = response.json()
         except ValueError:

@@ -9,8 +9,9 @@ import { RizError } from "./index.js";
 /** Databricks Apps forwards the signed-in user's token in this header. */
 export const FORWARDED_TOKEN_HEADER = "x-forwarded-access-token";
 
-// The same shape the riz API accepts: a bare lower-case host. Anything else could send the
-// user's token somewhere other than a Databricks workspace.
+// The same shape the riz API accepts: a bare lower-case host, so no scheme, port, path or
+// userinfo rides along. shortcut: any DNS name passes, so the caller must trust where the
+// host comes from; restrict to Databricks suffixes or an allow-list if it is ever untrusted.
 const HOST =
   /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 const DENIED_CODES = new Set(["PERMISSION_DENIED", "UNAUTHENTICATED"]);
@@ -65,8 +66,11 @@ export function userTokenFromHeaders(
       : Object.entries(headers).find(
           ([name]) => name.toLowerCase() === FORWARDED_TOKEN_HEADER,
         )?.[1];
-  // A repeated header (an array) is ambiguous, so it is not used.
-  if (typeof value === "string" && value !== "") return value;
+  // A repeated header is ambiguous, so it is not used: an array, or the ", "-joined string
+  // that Headers.get returns (a token never contains a comma).
+  if (typeof value === "string" && value !== "" && !value.includes(",")) {
+    return value;
+  }
   throw new MissingUserCredentialError(
     `no ${FORWARDED_TOKEN_HEADER} header; refusing to query without the user's credential`,
   );

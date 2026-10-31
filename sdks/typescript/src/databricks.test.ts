@@ -7,6 +7,7 @@ import {
   Databricks,
   DatabricksDeniedError,
   DatabricksError,
+  FORWARDED_TOKEN_HEADER,
   MissingUserCredentialError,
   userTokenFromHeaders,
 } from "./databricks.js";
@@ -105,6 +106,17 @@ test("reads the token databricks apps forwards, whatever the header case", () =>
       new Headers({ "x-forwarded-access-token": USER_TOKEN }),
     ),
     USER_TOKEN,
+  );
+});
+
+test("a repeated forwarded header is ambiguous, so it is not used", () => {
+  const headers = new Headers();
+  headers.append(FORWARDED_TOKEN_HEADER, "a");
+  headers.append(FORWARDED_TOKEN_HEADER, "b");
+
+  assert.throws(
+    () => userTokenFromHeaders(headers),
+    MissingUserCredentialError,
   );
 });
 

@@ -37,6 +37,11 @@ const principals: Record<string, Principal> = {
     scopes: ["check"],
     applications: ["crm-prod"],
   },
+  reader: {
+    subject: "reader",
+    scopes: ["providers:read"],
+    applications: ["*"],
+  },
   noScopes: { subject: "nobody", scopes: [], applications: ["*"] },
 };
 
@@ -146,12 +151,46 @@ test(
       assert.equal((await call("workload", "GET", crm)).status, 404);
 
       const { rows } = await pool.query(
-        "SELECT action, actor FROM audit_events WHERE action LIKE 'providers.%' ORDER BY id",
+        "SELECT id, action, actor, application_id FROM audit_events WHERE action LIKE 'providers.%' ORDER BY id",
       );
       assert.deepEqual(
-        rows.map((r) => r.action),
-        ["providers.put", "providers.delete"],
+        rows.map((r) => [r.action, r.actor, r.application_id]),
+        [
+          ["providers.put", "platform", "crm-prod"],
+          ["providers.delete", "platform", "crm-prod"],
+        ],
       );
+      assert.equal(put.audit, String(rows[0]?.id));
+      assert.equal(del.audit, String(rows[1]?.id));
+    }),
+);
+
+test(
+  "a read-only caller cannot change settings and a workload cannot read another application's",
+  opts,
+  () =>
+    withApp(async ({ call, pool }) => {
+      await call("platform", "PUT", P, { application: "crm-prod", config });
+
+      assert.equal(
+        (
+          await call("reader", "PUT", P, {
+            application: "crm-prod",
+            config: { ...config, warehouseId: "other" },
+          })
+        ).status,
+        403,
+      );
+      assert.equal((await call("reader", "DELETE", crm)).status, 403);
+      assert.equal((await call("reader", "GET", crm)).status, 200);
+      assert.equal(
+        (await call("workload", "GET", `${P}?application=hr-prod`)).status,
+        403,
+      );
+      const { rows } = await pool.query(
+        "SELECT config FROM provider_configs WHERE application_id = 'crm-prod'",
+      );
+      assert.deepEqual(rows[0]?.config, config);
     }),
 );
 

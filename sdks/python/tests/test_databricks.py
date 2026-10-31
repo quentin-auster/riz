@@ -192,6 +192,8 @@ def test_a_transport_failure_does_not_carry_the_user_token() -> None:
         _run(boom, user_token=USER_TOKEN)
 
     assert USER_TOKEN not in "".join(traceback.format_exception(raised.value))
+    # The httpx error quotes the header, so it must not survive on the exception either.
+    assert raised.value.__context__ is None and raised.value.__cause__ is None
 
 
 @pytest.mark.skipif(
