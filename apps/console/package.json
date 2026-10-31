@@ -8,9 +8,13 @@
     "build": "vite build",
     "start": "node build",
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "echo 'no console tests yet'"
+    "test": "tsx --test src/lib/server/*.test.ts"
+  },
+  "dependencies": {
+    "jose": "6.2.14"
   },
   "devDependencies": {
+    "tsx": "4.20.6",
     "@sveltejs/adapter-node": "5.4.0",
     "@sveltejs/kit": "2.46.5",
     "@sveltejs/vite-plugin-svelte": "6.2.1",
