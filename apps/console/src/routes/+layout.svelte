@@ -7,6 +7,7 @@
   {#if data.subject}
     <nav>
       <a href="/">Home</a>
+      <a href="/applications">Applications</a>
     </nav>
     <form method="POST" action="/logout">
       <span>{data.subject}</span>
