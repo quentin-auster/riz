@@ -1,4 +1,5 @@
 import type pg from "pg";
+import { recordAudit } from "../admin/audit.js";
 import { ApplicationNotFound } from "../checks/resolver.js";
 import type { TokenVerifier } from "./oidc.js";
 import type { Authenticator, EndUserVerifier } from "./principal.js";
@@ -60,6 +61,8 @@ export function createBindingStore(pool: pg.Pool) {
     action: string,
     b: WorkloadBinding,
     sql: string,
+    bound: boolean,
+    requestId: string | undefined,
   ): Promise<void> {
     const client = await pool.connect();
     try {
@@ -71,16 +74,16 @@ export function createBindingStore(pool: pg.Pool) {
       ]);
       // An idempotent repeat changes nothing, so it is not an event.
       if (rowCount) {
-        await client.query(
-          `INSERT INTO audit_events (actor, action, application_id, outcome, detail)
-           VALUES ($1, $2, $3, 'success', $4)`,
-          [
-            actor,
-            action,
-            b.application,
-            { issuer: b.issuer, workload: b.workload },
-          ],
-        );
+        const binding = { issuer: b.issuer, workload: b.workload };
+        await recordAudit(client, {
+          actor,
+          action,
+          applicationId: b.application,
+          requestId,
+          detail: bound
+            ? { before: null, after: binding }
+            : { before: binding, after: null },
+        });
       }
       await client.query("COMMIT");
     } catch (err) {
@@ -103,22 +106,26 @@ export function createBindingStore(pool: pg.Pool) {
       return rows.map((r) => r.application_id);
     }) satisfies BindingLookup,
 
-    bind: (actor: string, b: WorkloadBinding) =>
+    bind: (actor: string, b: WorkloadBinding, requestId?: string) =>
       audited(
         actor,
         "workloads.bind",
         b,
         `INSERT INTO workload_bindings (issuer, workload, application_id)
          VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        true,
+        requestId,
       ),
 
-    unbind: (actor: string, b: WorkloadBinding) =>
+    unbind: (actor: string, b: WorkloadBinding, requestId?: string) =>
       audited(
         actor,
         "workloads.unbind",
         b,
         `DELETE FROM workload_bindings
           WHERE issuer = $1 AND workload = $2 AND application_id = $3`,
+        false,
+        requestId,
       ),
   };
 }

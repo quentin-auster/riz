@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { ApplicationNotFound } from "../checks/resolver.js";
-import { HttpError, readJson, send } from "../http.js";
+import { HttpError, readJson, requestIdOf, send } from "../http.js";
 import type { Principal } from "./principal.js";
 import type { BindingStore, WorkloadBinding } from "./workloads.js";
 
@@ -69,7 +69,7 @@ export function workloadRoutes(store: BindingStore) {
           throw invalid();
         }
         const binding = toBinding(body as Record<string, unknown>);
-        await store.bind(principal.subject, binding);
+        await store.bind(principal.subject, binding, requestIdOf(res));
         send(res, 201, binding);
       } else {
         const binding = toBinding({
@@ -77,7 +77,7 @@ export function workloadRoutes(store: BindingStore) {
           workload: url.searchParams.get("workload"),
           application: url.searchParams.get("application"),
         });
-        await store.unbind(principal.subject, binding);
+        await store.unbind(principal.subject, binding, requestIdOf(res));
         res.statusCode = 204;
         res.end();
       }

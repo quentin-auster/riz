@@ -465,7 +465,10 @@ paths:
       tags: [audit]
       operationId: listAuditEvents
       summary: List audit events
-      description: "Required scope: `audit:read`."
+      description: >-
+        Required scope: `audit:read`. Only events for applications on the caller's
+        allow-list are returned; `application` narrows that and never widens it.
+        `from` is inclusive and `to` exclusive.
       security:
         - bearerAuth: [audit:read]
       parameters:
@@ -807,6 +810,10 @@ components:
           enum: [success, denied, error]
         requestId:
           type: string
+        detail:
+          type: object
+          description: >-
+            Before/after summary of the change. Never contains tokens or protected data.
     AuditList:
       type: object
       required: [items]

@@ -2,6 +2,7 @@ import { OpenFgaClient } from "@openfga/sdk";
 import type { transformer } from "@openfga/syntax-transformer";
 import type pg from "pg";
 import { ApplicationNotFound } from "../checks/resolver.js";
+import { type AuditFilter, listAudit, recordAudit } from "./audit.js";
 
 type ModelJson = ReturnType<typeof transformer.transformDSLToJSONObject>;
 
@@ -63,6 +64,7 @@ export function createAdminService(deps: {
     async register(
       actor: string,
       input: { name: string; environment: string },
+      requestId?: string,
     ): Promise<Application> {
       const id = `${input.name}-${input.environment}`;
       const existing = await pool.query(
@@ -97,11 +99,13 @@ export function createAdminService(deps: {
           "INSERT INTO model_bindings (application_id, model_id, active) VALUES ($1, $2, true)",
           [id, modelId],
         );
-        await client.query(
-          `INSERT INTO audit_events (actor, action, application_id, outcome)
-           VALUES ($1, 'applications.create', $2, 'success')`,
-          [actor, id],
-        );
+        await recordAudit(client, {
+          actor,
+          action: "applications.create",
+          applicationId: id,
+          requestId,
+          detail: { before: null, after: input },
+        });
         await client.query("COMMIT");
         return toApplication(rows[0]);
       } catch (err) {
@@ -129,6 +133,9 @@ export function createAdminService(deps: {
         ? { items, nextCursor: encode(last.id) }
         : { items };
     },
+
+    audit: (allowed: Allowed, page: PageParams, filter?: AuditFilter) =>
+      listAudit(pool, allowed, page, filter),
 
     async models(
       applicationId: string,
