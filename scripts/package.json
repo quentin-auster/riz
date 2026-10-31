@@ -10,8 +10,10 @@
   },
   "devDependencies": {
     "@types/node": "22.18.10",
+    "ajv": "8.20.0",
     "tsx": "4.20.6",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "yaml": "2.9.1"
   },
   "dependencies": {
     "@openfga/sdk": "0.9.7",

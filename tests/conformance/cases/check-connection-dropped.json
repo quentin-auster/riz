@@ -1,0 +1,17 @@
+{
+  "name": "check raises a transport error when the connection is dropped",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": { "drop": true },
+  "expect": {
+    "error": { "type": "RizTransportError" }
+  }
+}

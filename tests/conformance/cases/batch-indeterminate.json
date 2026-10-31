@@ -1,0 +1,34 @@
+{
+  "name": "batch check reports indeterminate items as not allowed, without raising",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "checks": [
+      { "action": "read", "resource": "document:d1" },
+      { "action": "delete", "resource": "document:d1" }
+    ]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "requestId": "req_13",
+      "results": [
+        { "correlationId": "0", "status": "indeterminate" },
+        { "correlationId": "1", "status": "indeterminate" }
+      ]
+    }
+  },
+  "expect": {
+    "result": {
+      "requestId": "req_13",
+      "results": [
+        { "status": "indeterminate", "allowed": false },
+        { "status": "indeterminate", "allowed": false }
+      ]
+    }
+  }
+}

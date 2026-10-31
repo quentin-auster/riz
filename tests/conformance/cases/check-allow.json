@@ -1,0 +1,30 @@
+{
+  "name": "check resolves allowed when riz answers allow",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check",
+    "body": {
+      "application": "crm",
+      "relation": "read",
+      "object": "document:d1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": { "status": "allow", "requestId": "req_1", "modelId": "model_1" }
+  },
+  "expect": {
+    "result": {
+      "allowed": true,
+      "status": "allow",
+      "requestId": "req_1",
+      "modelId": "model_1"
+    }
+  }
+}

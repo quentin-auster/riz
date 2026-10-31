@@ -56,6 +56,10 @@ jobs:
         env:
           RIZ_API_URL: http://localhost:8080
           OPENFGA_API_URL: http://localhost:8081
+      - run: pnpm --filter @riz/sdk test:integration
+        env:
+          RIZ_API_URL: http://localhost:8080
+          OPENFGA_API_URL: http://localhost:8081
       - if: failure()
         run: docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api openfga
 

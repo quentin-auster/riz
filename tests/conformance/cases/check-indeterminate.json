@@ -1,0 +1,33 @@
+{
+  "name": "check raises instead of resolving when riz answers indeterminate",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check",
+    "body": {
+      "application": "crm",
+      "relation": "read",
+      "object": "document:d1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "status": "indeterminate",
+      "requestId": "req_3",
+      "code": "timeout"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizIndeterminateError",
+      "code": "timeout",
+      "requestId": "req_3"
+    }
+  }
+}

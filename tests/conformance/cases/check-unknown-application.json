@@ -1,0 +1,29 @@
+{
+  "name": "check raises an api error for an unknown application",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "code": "not_found",
+      "message": "Application not found.",
+      "requestId": "req_8"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizApiError",
+      "status": 404,
+      "code": "not_found",
+      "requestId": "req_8"
+    }
+  }
+}

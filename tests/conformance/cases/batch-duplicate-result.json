@@ -1,0 +1,35 @@
+{
+  "name": "batch check treats an item riz answered twice as indeterminate",
+  "call": {
+    "operation": "batchCheck",
+    "endUserToken": "alice-token",
+    "checks": [
+      { "action": "read", "resource": "document:d1" },
+      { "action": "read", "resource": "document:d2" }
+    ]
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/batch-check"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "requestId": "req_16",
+      "modelId": "model_1",
+      "results": [
+        { "correlationId": "0", "status": "deny" },
+        { "correlationId": "0", "status": "allow" },
+        { "correlationId": "1", "status": "allow" }
+      ]
+    }
+  },
+  "expect": {
+    "result": {
+      "results": [
+        { "status": "indeterminate", "allowed": false },
+        { "status": "allow", "allowed": true }
+      ]
+    }
+  }
+}

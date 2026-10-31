@@ -1,0 +1,22 @@
+{
+  "name": "check does not follow a redirect, so credentials go nowhere else",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 302,
+    "headers": { "location": "/v1/elsewhere" },
+    "body": ""
+  },
+  "nonconformingResponse": true,
+  "expect": {
+    "error": { "type": "RizApiError", "status": 302 }
+  }
+}

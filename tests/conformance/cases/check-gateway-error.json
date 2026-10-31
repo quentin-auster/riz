@@ -1,0 +1,21 @@
+{
+  "name": "check raises an api error for a gateway error that is not JSON",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 502,
+    "body": "<html>Bad Gateway</html>"
+  },
+  "nonconformingResponse": true,
+  "expect": {
+    "error": { "type": "RizApiError", "status": 502 }
+  }
+}

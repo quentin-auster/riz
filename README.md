@@ -16,6 +16,34 @@ curl localhost:8080/health/live
 make down
 ```
 
+## SDKs
+
+Both SDKs are thin clients with the same behavior; `tests/conformance` holds the
+cases they share. A check is made for an end user, whose verified token you pass
+per call; the workload's own token is the client's `credentials`.
+
+```ts
+import { Riz } from "@riz/sdk";
+
+const riz = new Riz({ baseUrl, credentials, application: "crm" });
+const { allowed } = await riz.check({ action: "read", resource: "document:d1", endUserToken });
+const { results } = await riz.batchCheck(
+  [{ action: "read", resource: "document:d1" }, { action: "delete", resource: "document:d1" }],
+  { endUserToken },
+);
+```
+
+```python
+async with Riz(base_url, credentials, "crm") as riz:
+    decision = await riz.check(action="read", resource="document:d1", end_user_token=token)
+    batch = await riz.batch_check([Check("read", "document:d1")], end_user_token=token)
+```
+
+An undecidable check never reads as an allow: `check` raises
+`RizIndeterminateError`, and a batch item riz could not decide has status
+`indeterminate` and `allowed` false. Treat any exception as a deny. The SDKs do
+not retry, and they do not follow redirects.
+
 ## Layout
 
 | Path | Purpose |

@@ -1,0 +1,21 @@
+{
+  "name": "check treats a status it does not recognize as deny",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 200,
+    "body": { "status": "maybe", "requestId": "req_4" }
+  },
+  "nonconformingResponse": true,
+  "expect": {
+    "result": { "allowed": false, "status": "deny", "requestId": "req_4" }
+  }
+}

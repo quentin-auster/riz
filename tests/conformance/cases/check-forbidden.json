@@ -1,0 +1,29 @@
+{
+  "name": "check raises an auth error when the workload lacks the check scope",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "document:d1"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 403,
+    "body": {
+      "code": "forbidden",
+      "message": "Missing scope check.",
+      "requestId": "req_6"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizAuthError",
+      "status": 403,
+      "code": "forbidden",
+      "requestId": "req_6"
+    }
+  }
+}

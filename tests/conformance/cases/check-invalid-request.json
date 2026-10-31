@@ -1,0 +1,29 @@
+{
+  "name": "check raises a validation error when riz rejects the request",
+  "call": {
+    "operation": "check",
+    "endUserToken": "alice-token",
+    "action": "read",
+    "resource": "not an object"
+  },
+  "expectRequest": {
+    "method": "POST",
+    "path": "/v1/check"
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "code": "invalid_request",
+      "message": "Body must be {application, relation, object} with valid values.",
+      "requestId": "req_7"
+    }
+  },
+  "expect": {
+    "error": {
+      "type": "RizValidationError",
+      "status": 400,
+      "code": "invalid_request",
+      "requestId": "req_7"
+    }
+  }
+}
