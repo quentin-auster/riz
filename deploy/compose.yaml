@@ -90,6 +90,11 @@ services:
     <<: *api
     profiles: [replicas]
     ports: []
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     deploy:
       replicas: ${RIZ_REPLICAS:-2}
 
