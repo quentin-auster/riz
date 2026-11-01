@@ -1,0 +1,16 @@
+{
+  "name": "@riz/security",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test:security": "tsx --test --test-concurrency=1 *.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.10",
+    "jose": "6.2.14",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  }
+}

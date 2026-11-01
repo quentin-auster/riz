@@ -3,5 +3,6 @@ packages:
   - sdks/typescript
   - scripts
   - tests/load
+  - tests/security
 onlyBuiltDependencies:
   - esbuild
