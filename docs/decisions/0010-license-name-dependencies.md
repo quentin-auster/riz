@@ -6,14 +6,20 @@ Reviewed 2026-11-01 for RIZ-044.
 
 - riz ships under **Apache-2.0** (`LICENSE`, unmodified standard text). No `NOTICE` file:
   Apache-2.0 requires one only when we redistribute third-party NOTICE content, and the
-  source packages bundle no dependencies. Revisit when RIZ-046 builds container images.
+  source packages bundle no dependencies. Revisit when RIZ-046 publishes the container images
+  built from `deploy/*.Dockerfile`, which do bundle dependencies.
 - **npm**: keep `@riz/sdk`. The unscoped name `riz` is taken (`riz@0.0.1`, unrelated, last
   published 2022). No package exists under `@riz/`, but scope ownership could not be
   confirmed from here.
 - **PyPI**: `riz` is taken (an unrelated programming language, `riz@0.1`). Publish the
-  Python SDK as **`riz-sdk`** (free on 2026-11-01). The import name stays `import riz`; only
+  Python SDK as **`riz-sdk`** (it returned 404 on 2026-11-01; PyPI may still reject a name
+  that normalizes to an existing one). The import name stays `import riz`; only
   `[project].name` in `sdks/python/pyproject.toml` changes, and that change belongs to
   RIZ-045.
+- **Manifests**: no package manifest declares a `license` field yet, so published packages
+  would show none. RIZ-045 must add `Apache-2.0` to `sdks/python/pyproject.toml` and
+  `sdks/typescript/package.json`. `LICENSE` keeps the stock appendix placeholder
+  (`Copyright [yyyy] [name of copyright owner]`); the maintainer names the copyright holder.
 
 ## Dependency licenses
 
@@ -35,9 +41,10 @@ Python SDK runtime tree (`uv tree --no-dev`, read from installed metadata):
 | typing-extensions | PSF-2.0 |
 | certifi | MPL-2.0 |
 
-All are permissive and compatible with Apache-2.0 except for one note: `certifi` is MPL-2.0
-(file-level copyleft). It is an unmodified, separately installed dependency, so it places no
-obligation on riz's own source. Do not vendor or patch it.
+All are compatible with Apache-2.0. Most are permissive (MIT, BSD, ISC, Apache-2.0,
+PSF-2.0); `certifi` is MPL-2.0 (file-level copyleft). It is an unmodified, separately
+installed dependency, so it places no obligation on riz's own source. Do not vendor or
+patch it.
 
 Not covered: dev-only dependencies (not distributed), and the OS and runtime layers of the
 container images (RIZ-046 must include them in its SBOM). OpenFGA itself is Apache-2.0 and
