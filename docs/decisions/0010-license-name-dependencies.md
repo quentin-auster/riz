@@ -19,7 +19,7 @@ Reviewed 2026-11-01 for RIZ-044.
 - **Manifests**: no package manifest declares a `license` field yet, so published packages
   would show none. RIZ-045 must add `Apache-2.0` to `sdks/python/pyproject.toml` and
   `sdks/typescript/package.json`. `LICENSE` keeps the stock appendix placeholder
-  (`Copyright [yyyy] [name of copyright owner]`); the maintainer names the copyright holder.
+  (`Copyright [yyyy] [name of copyright owner]`); the copyright holder is Quentin Auster.
 
 ## Dependency licenses
 
@@ -57,4 +57,5 @@ runs as a separate service.
 - **`@riz` npm scope**: an empty `npm search` and a 403 from npmjs.com do not prove the
   scope is free. Create the `riz` npm org (or confirm ownership) before RIZ-045. If it
   cannot be claimed, fall back to an unscoped `riz-sdk`.
-- **Final names are a recommendation**, to be agreed by the maintainer before RIZ-045.
+- **Names agreed** by the maintainer (2026-11-01): `@riz/sdk` and `riz-sdk`. Nothing is
+  published yet; claiming the scope and PyPI name happens in RIZ-045.
