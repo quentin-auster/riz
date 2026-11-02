@@ -1,10 +1,13 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { bootstrapAdmin } from "./bootstrap.js";
+import { validateExtension, writeExtension } from "./extension.js";
 import { validateModel, writeModel } from "./model.js";
 
 const usage = `usage:
   pnpm model validate <model.fga>
+  pnpm model validate-extension <extension.fga>   (core + extension, both suites)
+  pnpm model write-extension <extension.fga> --store-id <id> [--api-url <url>]
   pnpm model write <model.fga> --store-id <id> [--api-url <url>]   (default OPENFGA_API_URL)
   pnpm model bootstrap-admin --admin <subject> [--api-url <url>]   (default OPENFGA_API_URL)`;
 
@@ -52,6 +55,17 @@ if (command === "validate") {
     process.exit(2);
   }
   console.log(await writeModel(modelFile, { apiUrl, storeId }));
+} else if (command === "validate-extension") {
+  validateExtension(modelFile);
+  console.log("ok");
+} else if (command === "write-extension") {
+  const storeId = values["store-id"];
+  const apiUrl = values["api-url"] ?? process.env.OPENFGA_API_URL;
+  if (!storeId || !apiUrl) {
+    console.error(usage);
+    process.exit(2);
+  }
+  console.log(await writeExtension(modelFile, { apiUrl, storeId }));
 } else {
   console.error(usage);
   process.exit(2);

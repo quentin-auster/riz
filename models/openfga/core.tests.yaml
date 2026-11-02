@@ -1,0 +1,32 @@
+name: core
+model_file: ./core.fga
+
+tuples:
+  - { user: user:olga, relation: admin, object: organization:acme }
+  - { user: user:mike, relation: member, object: organization:acme }
+  - { user: organization:acme, relation: organization, object: application:crm }
+
+tests:
+  - name: organization roles
+    check:
+      - user: user:olga
+        object: organization:acme
+        assertions: { admin: true, member: true }
+      - user: user:mike
+        object: organization:acme
+        assertions: { admin: false, member: true }
+      - user: user:vic
+        object: organization:acme
+        assertions: { admin: false, member: false }
+
+  - name: application roles come from the organization
+    check:
+      - user: user:olga
+        object: application:crm
+        assertions: { admin: true, member: true }
+      - user: user:mike
+        object: application:crm
+        assertions: { admin: false, member: true }
+      - user: user:vic
+        object: application:crm
+        assertions: { admin: false, member: false }

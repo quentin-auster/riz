@@ -28,7 +28,8 @@ versioned migrations (AGENTS.md principle 11).
 
 A model file is a complete DSL document; an application model starts as a copy
 of `base.fga` and then diverges. A model always lives next to a `tests.yaml`
-whose assertions must pass before it can be written.
+whose assertions must pass before it can be written. To keep an application's model
+aligned with the central roles, use a core + extension instead (ADR 0011).
 
 ### Tooling (`scripts/`)
 
