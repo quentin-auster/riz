@@ -1,0 +1,15 @@
+model
+  schema 1.1
+
+type user
+
+type organization
+  relations
+    define admin: [user]
+    define member: [user] or admin
+
+type application
+  relations
+    define organization: [organization]
+    define admin: admin from organization
+    define member: member from organization

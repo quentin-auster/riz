@@ -1,0 +1,29 @@
+name: crm-extension
+model_file: ./extension.fga
+
+tuples:
+  - { user: user:olga, relation: admin, object: organization:acme }
+  - { user: organization:acme, relation: organization, object: project:p1 }
+  - { user: team:eng, relation: team, object: project:p1 }
+  - { user: user:tara, relation: member, object: team:eng }
+  - { user: user:ed, relation: editor, object: project:p1 }
+  - { user: project:p1, relation: project, object: document:d1 }
+
+tests:
+  - name: the organization admin from the core owns the application's projects
+    check:
+      - user: user:olga
+        object: document:d1
+        assertions: { read: true, edit: true, delete: true, share: true }
+
+  - name: application-defined roles are finer-grained than the core roles
+    check:
+      - user: user:ed
+        object: document:d1
+        assertions: { read: true, edit: true, delete: false, share: false }
+      - user: user:tara
+        object: document:d1
+        assertions: { read: true, edit: false, delete: false, share: false }
+      - user: user:mike
+        object: document:d1
+        assertions: { read: false, edit: false, delete: false, share: false }
