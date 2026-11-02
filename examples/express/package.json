@@ -1,0 +1,13 @@
+{
+  "name": "@riz/example-express",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@riz/sdk": "workspace:*",
+    "express": "5.3.0"
+  }
+}
