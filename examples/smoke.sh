@@ -5,6 +5,13 @@ set -eu
 
 export RIZ_API_URL="${RIZ_API_URL:-http://localhost:8080}"
 export RIZ_WORKLOAD_TOKEN=dev-check-token
+for port in 8101 8102; do
+  if curl -s -o /dev/null "http://localhost:$port/"; then
+    echo "port $port is already in use; stop whatever is listening and rerun" >&2
+    exit 1
+  fi
+done
+
 RIZ_APPLICATION=$(examples/seed.sh)
 export RIZ_APPLICATION
 

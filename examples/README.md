@@ -28,6 +28,6 @@ Then run an example from its README. Stop the stack with `make down`.
 
 ## Smoke test
 
-`examples/smoke.sh` runs the setup above, starts both examples and checks four outcomes
-for each: allowed (200), denied (403), no token (401), unknown token (401). CI runs it in the
+With the stack up (`make up`), `examples/smoke.sh` seeds an application, starts both
+examples and checks four outcomes for each: allowed (200), denied (403), no token (401), unknown token (401). CI runs it in the
 `examples` job. The Databricks example is not part of it.
