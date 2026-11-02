@@ -57,6 +57,43 @@ type folder
   assert.throws(() => validateExtension(file), /types only/);
 });
 
+test("rejects an extension when the core suite fails", () => {
+  const dir = mkdtempSync(join(tmpdir(), "riz-core-"));
+  // A core suite expecting members to be admins, which this core model denies.
+  writeFileSync(
+    join(dir, "core.fga"),
+    `model
+  schema 1.1
+
+type user
+
+type organization
+  relations
+    define admin: [user]
+    define member: [user] or admin
+`,
+  );
+  writeFileSync(
+    join(dir, "core.tests.yaml"),
+    `name: core
+model_file: ./core.fga
+tuples:
+  - { user: user:mike, relation: member, object: organization:acme }
+tests:
+  - name: a member is not an admin
+    check:
+      - user: user:mike
+        object: organization:acme
+        assertions: { admin: true }
+`,
+  );
+  const file = extensionDir(`type folder
+  relations
+    define owner: [user]
+`);
+  assert.throws(() => validateExtension(file, join(dir, "core.fga")), /assertions failed/);
+});
+
 test("rejects an extension whose assertions fail", () => {
   const file = extensionDir(
     `type folder

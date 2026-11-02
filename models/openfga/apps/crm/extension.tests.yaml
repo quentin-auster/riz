@@ -24,6 +24,15 @@ tests:
       - user: user:tara
         object: document:d1
         assertions: { read: true, edit: false, delete: false, share: false }
+
+  - name: application-defined roles grant no central role
+    check:
+      - user: user:ed
+        object: organization:acme
+        assertions: { admin: false, member: false }
+      - user: user:tara
+        object: organization:acme
+        assertions: { admin: false, member: false }
       - user: user:mike
         object: document:d1
         assertions: { read: false, edit: false, delete: false, share: false }
