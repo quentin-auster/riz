@@ -65,6 +65,23 @@ jobs:
       - if: failure()
         run: docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api openfga
 
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: cp .env.example .env
+      - run: docker compose --env-file .env -f deploy/compose.yaml up -d --build --wait api
+      - uses: astral-sh/setup-uv@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: examples/smoke.sh
+      - if: failure()
+        run: docker compose --env-file .env -f deploy/compose.yaml logs --tail 50 api openfga
+
   replicas:
     runs-on: ubuntu-latest
     steps:

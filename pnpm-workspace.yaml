@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - sdks/typescript
+  - examples/express
   - scripts
   - tests/load
   - tests/security

@@ -1,0 +1,12 @@
+[project]
+name = "riz-example-fastapi"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi==0.162.0", "uvicorn==0.54.0", "riz"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+# The SDK is not published yet; use the checkout.
+riz = { path = "../../sdks/python" }
