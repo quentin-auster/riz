@@ -23,7 +23,14 @@ resources in the extension and build them on core roles (`admin from organizatio
 - Extensions only add to what the core grants. A Databricks (Unity Catalog) grant is still
   enforced natively and not mirrored into OpenFGA (ADR 0007), so an application can narrow
   access beyond it but not widen it.
-- `POST /v1/models` still takes a complete DSL document and its own assertions (ADR 0005);
-  it does not compose or enforce the core. shortcut: have the API compose server-side if
+- **The core is not enforced anywhere server-side.** `POST /v1/models` and `pnpm model write`
+  take a complete DSL document and its own assertions (ADR 0005); neither composes nor
+  checks the core, so an application that skips `write-extension` can redefine a central
+  role. The guarantee holds only for models written through this CLI. Composing in the API
+  is the follow-up that delivers it. shortcut: have the API compose server-side if
   applications are to submit extensions without the CLI.
+- A suite must test the composed model: an extension tests file that sets an inline `model:`
+  is rejected, because the `fga` CLI would test that model instead of the composed one.
+- If the core gains a type whose name an application already uses, that application's
+  extension fails to compose until it renames the type. Nothing warns owners in advance.
 - `base.fga` is unchanged and remains the starter model.
