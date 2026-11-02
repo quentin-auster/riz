@@ -16,6 +16,19 @@ curl localhost:8080/health/live
 make down
 ```
 
+To go on to your first allowed check, follow [docs/quickstart.md](docs/quickstart.md).
+
+## Documentation
+
+| Page | For |
+| --- | --- |
+| [docs/quickstart.md](docs/quickstart.md) | Clone to first allowed check |
+| [docs/architecture.md](docs/architecture.md) | Components, a check end to end, revocation freshness |
+| [docs/operations.md](docs/operations.md) | Deploy, scale, backup, model migration, rollback, incidents |
+| [docs/security.md](docs/security.md) | Threat model and the test behind each mitigation |
+| [docs/decisions](docs/decisions/README.md) | Architecture decision records |
+| [examples](examples/README.md) | FastAPI, Express and Databricks examples |
+
 ## SDKs
 
 Both SDKs are thin clients with the same behavior; `tests/conformance` holds the
