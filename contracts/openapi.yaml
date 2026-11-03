@@ -529,7 +529,8 @@ paths:
         "422":
           description: >-
             The model parsed but an assertion did not hold
-            (`assertions_failed`); nothing was bound.
+            (`assertions_failed`), or it drops, repeats or changes a riz core type
+            (`core_violation`); nothing was bound.
           content:
             application/json:
               schema:
@@ -1149,14 +1150,26 @@ components:
     ModelSubmit:
       type: object
       additionalProperties: false
-      required: [application, model, assertions]
+      required: [application, assertions]
+      oneOf:
+        - required: [model]
+        - required: [extension]
       properties:
         application:
           $ref: "#/components/schemas/ApplicationId"
         model:
           type: string
           maxLength: 200000
-          description: The model in OpenFGA DSL.
+          description: >-
+            A complete model in OpenFGA DSL. It must contain every riz core type exactly
+            once and unchanged. Exactly one of `model` or `extension`.
+        extension:
+          type: string
+          maxLength: 200000
+          description: >-
+            Types only (no `model` header) in OpenFGA DSL, composed after the riz core
+            model, which it may reference but cannot redeclare. Exactly one of `model`
+            or `extension`.
         tuples:
           type: array
           maxItems: 100

@@ -121,6 +121,10 @@ async function withApp(
         pool,
         lookup: dbLookup(pool),
         apiUrl: apiUrl as string,
+        core: readFileSync(
+          join(import.meta.dirname, "../../../../models/openfga/core.fga"),
+          "utf8",
+        ),
       }),
     ),
   });
@@ -424,5 +428,76 @@ test(
           .status,
         404,
       );
+    }),
+);
+
+const extensionBody = (extension: string) => ({
+  application: "crm-prod",
+  extension,
+  tuples: [
+    { subject: "user:olga", relation: "admin", object: "organization:acme" },
+    {
+      subject: "organization:acme",
+      relation: "organization",
+      object: "application:crm",
+    },
+    { subject: "user:pat", relation: "owner", object: "folder:f" },
+  ],
+  assertions: [
+    // The extension builds on a central role...
+    {
+      subject: "user:olga",
+      relation: "owner",
+      object: "folder:f",
+      allowed: true,
+    },
+    // ...and is finer-grained than it.
+    {
+      subject: "user:pat",
+      relation: "owner",
+      object: "folder:f",
+      allowed: true,
+    },
+    {
+      subject: "user:bob",
+      relation: "owner",
+      object: "folder:f",
+      allowed: false,
+    },
+  ],
+});
+const folderExtension = `type folder
+  relations
+    define owner: [user] or admin from organization
+    define organization: [organization]
+`;
+
+test(
+  "an extension on the core is bound, and one that redeclares a core type is refused",
+  opts,
+  () =>
+    withApp(async ({ call, pool, activeModel }) => {
+      const before = await activeModel("crm-prod");
+
+      const refused = await call(
+        "crmAdmin",
+        "/v1/models",
+        extensionBody(`type organization
+  relations
+    define admin: [user, user:*]
+`),
+      );
+      assert.equal(refused.status, 422);
+      assert.equal(refused.body?.code, "core_violation");
+      assert.equal(await activeModel("crm-prod"), before);
+
+      const bound = await call(
+        "crmAdmin",
+        "/v1/models",
+        extensionBody(folderExtension),
+      );
+      assert.equal(bound.status, 201);
+      assert.equal(await activeModel("crm-prod"), bound.body?.id);
+      assert.equal((await modelEvents(pool)).rows.length, 1);
     }),
 );
