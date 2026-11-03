@@ -27,7 +27,12 @@ resources in the extension and build them on core roles (`admin from organizatio
 ## Consequences and limits
 
 - A change to the core is picked up by re-submitting each application's extension; it is not
-  applied automatically, and an existing binding keeps the model it was bound with.
+  applied automatically, and an existing binding keeps the model it was bound with. The core
+  is read when the API starts, so a core change needs a restart.
+- **Rollback is governed too.** `POST /v1/models/rollback` re-reads the stored model and
+  applies the same core check, so a model bound before the guard existed, or under an older
+  core, cannot be restored (422 `core_violation`). Such a model that is already active stays
+  active; nothing reports them. shortcut: add a report of bound models that fail the check.
 - The core may not reference non-core types. If it ever does, the equality check no longer
   proves the core's decisions are unchanged, and the check must be revisited.
 - Extensions only add to what the core grants. A Databricks (Unity Catalog) grant is still

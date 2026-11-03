@@ -53,9 +53,27 @@ export function createModelService(deps: {
   const { pool, lookup, apiUrl, core } = deps;
 
   type ModelJson = ReturnType<typeof transformer.transformDSLToJSONObject>;
-  const coreTypes = core
-    ? transformer.transformDSLToJSONObject(core).type_definitions
-    : [];
+  const coreTypes =
+    core === undefined
+      ? []
+      : transformer.transformDSLToJSONObject(core).type_definitions;
+  // An empty core would enforce nothing, which must fail at startup, not open the guard.
+  if (core !== undefined && coreTypes.length === 0) {
+    throw new Error("The core model defines no types");
+  }
+  // The guard proves a core type unchanged only if it depends on nothing outside the core.
+  const coreNames = new Set(coreTypes.map((t) => t.type));
+  for (const t of coreTypes) {
+    for (const rel of Object.values(t.metadata?.relations ?? {})) {
+      for (const d of rel.directly_related_user_types ?? []) {
+        if (!coreNames.has(d.type)) {
+          throw new Error(
+            `Core type ${t.type} references non-core type ${d.type}`,
+          );
+        }
+      }
+    }
+  }
 
   function parse(dsl: string): ModelJson {
     try {
@@ -234,27 +252,32 @@ export function createModelService(deps: {
     }
   }
 
+  /** A model this application has been bound to, as stored. */
+  async function stored(application: string, modelId: string) {
+    const found = await lookup(application);
+    if (!found) throw new ApplicationNotFound(application);
+    // Only models bound to this application: its store may hold others.
+    const known = await pool.query(
+      "SELECT 1 FROM model_bindings WHERE application_id = $1 AND model_id = $2",
+      [application, modelId],
+    );
+    if (!known.rowCount) throw new ModelNotFound();
+    const { authorization_model: model } = await fga(
+      () =>
+        new OpenFgaClient({
+          apiUrl,
+          storeId: found.storeId,
+        }).readAuthorizationModel({ authorizationModelId: modelId }),
+      (m) => new InvalidModel(m),
+    );
+    if (!model) throw new ModelNotFound();
+    return model;
+  }
+
   return {
     /** The DSL of a model this application has been bound to, for comparing versions. */
     async read(application: string, modelId: string): Promise<string> {
-      const found = await lookup(application);
-      if (!found) throw new ApplicationNotFound(application);
-      // Only models bound to this application: its store may hold others.
-      const known = await pool.query(
-        "SELECT 1 FROM model_bindings WHERE application_id = $1 AND model_id = $2",
-        [application, modelId],
-      );
-      if (!known.rowCount) throw new ModelNotFound();
-      const { authorization_model: model } = await fga(
-        () =>
-          new OpenFgaClient({
-            apiUrl,
-            storeId: found.storeId,
-          }).readAuthorizationModel({ authorizationModelId: modelId }),
-        (m) => new InvalidModel(m),
-      );
-      if (!model) throw new ModelNotFound();
-      return transformer.transformJSONToDSL(model);
+      return transformer.transformJSONToDSL(await stored(application, modelId));
     },
 
     /** Validate, assert, write a new immutable model, then bind it. The prior row stays as history. */
@@ -295,13 +318,23 @@ export function createModelService(deps: {
       return bind(actor, application, modelId, "models.bind", requestId, false);
     },
 
-    /** Re-binds a model this application has been bound to before. */
+    /**
+     * Re-binds a model this application has been bound to before, if it keeps the core:
+     * a model bound before the core existed, or under an older core, is not restored.
+     */
     async rollback(
       actor: string,
       application: string,
       modelId: string,
       requestId?: string,
     ): Promise<ModelEntry> {
+      if (core) {
+        // A stored model carries server defaults; the DSL round trip gives the parsed form.
+        const dsl = transformer.transformJSONToDSL(
+          await stored(application, modelId),
+        );
+        assertCoreIntact(parse(dsl));
+      }
       return bind(
         actor,
         application,

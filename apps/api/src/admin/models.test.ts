@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ConsistencyPreference } from "@openfga/sdk";
+import { ConsistencyPreference, OpenFgaClient } from "@openfga/sdk";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
 import type { Principal } from "../auth/index.js";
@@ -499,5 +499,39 @@ test(
       assert.equal(bound.status, 201);
       assert.equal(await activeModel("crm-prod"), bound.body?.id);
       assert.equal((await modelEvents(pool)).rows.length, 1);
+    }),
+);
+
+test(
+  "rollback refuses a model bound earlier that does not keep the core",
+  opts,
+  () =>
+    withApp(async ({ call, pool, activeModel }) => {
+      const active = await activeModel("crm-prod");
+      // A model that predates the core guard: anyone may be an organization admin.
+      const weakened = base.replace(
+        "define admin: [user]\n    define member",
+        "define admin: [user, user:*]\n    define member",
+      );
+      assert.notEqual(weakened, base);
+      const found = await dbLookup(pool)("crm-prod");
+      const { authorization_model_id: legacy } = await new OpenFgaClient({
+        apiUrl: apiUrl as string,
+        storeId: (found as { storeId: string }).storeId,
+      }).writeAuthorizationModel(
+        transformer.transformDSLToJSONObject(weakened),
+      );
+      await pool.query(
+        "INSERT INTO model_bindings (application_id, model_id, active) VALUES ('crm-prod', $1, false)",
+        [legacy],
+      );
+
+      const res = await call("crmAdmin", "/v1/models/rollback", {
+        application: "crm-prod",
+        modelId: legacy,
+      });
+      assert.equal(res.status, 422);
+      assert.equal(res.body?.code, "core_violation");
+      assert.equal(await activeModel("crm-prod"), active);
     }),
 );
