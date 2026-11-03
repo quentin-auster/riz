@@ -102,3 +102,55 @@ test("refuses an extension when the deployment has no core model", async () => {
     /no core model/,
   );
 });
+
+const base = readFileSync(
+  join(import.meta.dirname, "../../../../models/openfga/base.fga"),
+  "utf8",
+);
+
+test("a base-derived full model passes the core check", async () => {
+  // It gets past the core check and fails later, at the unreachable OpenFGA.
+  await assert.rejects(
+    submit({ model: base }),
+    (err: Error) => !/Core type/.test(err.message),
+  );
+});
+
+test("refuses a full model that repeats a core type", async () => {
+  await assert.rejects(
+    submit({ model: `${base}\ntype user\n` }),
+    /missing, repeated or changed: user/,
+  );
+});
+
+test("refuses to start with a core that references a non-core type", () => {
+  assert.throws(
+    () =>
+      createModelService({
+        pool: {} as pg.Pool,
+        lookup: async () => null,
+        apiUrl: "http://127.0.0.1:1",
+        core: `model
+  schema 1.1
+
+type user
+
+type widget
+  relations
+    define owner: [gadget]
+`,
+      }),
+    /references non-core type gadget/,
+  );
+});
+
+test("refuses to start with a core that defines no types", () => {
+  assert.throws(() =>
+    createModelService({
+      pool: {} as pg.Pool,
+      lookup: async () => null,
+      apiUrl: "http://127.0.0.1:1",
+      core: "model\n  schema 1.1\n",
+    }),
+  );
+});
