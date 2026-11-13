@@ -441,6 +441,11 @@ const extensionBody = (extension: string) => ({
       relation: "organization",
       object: "application:crm",
     },
+    {
+      subject: "organization:acme",
+      relation: "organization",
+      object: "folder:f",
+    },
     { subject: "user:pat", relation: "owner", object: "folder:f" },
   ],
   assertions: [
