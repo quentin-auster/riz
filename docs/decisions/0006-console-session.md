@@ -25,9 +25,9 @@ optionally `OIDC_CLIENT_SECRET`, `OIDC_AUDIENCE`.
   the ID token's expiry and there is no refresh.
 - **The API does not yet authenticate a signed-in user as an administrator.** In
   `RIZ_AUTH_MODE=oidc` a token is identified as its client (workload), not its user, and
-  admin access comes from that client's role in the riz-admin store (ADR 0004). A console
-  login reaches admin routes only if the console's client holds a role, which would then
-  apply to every user of the console; per-user admin identity is not built. The
+  admin access needs the token's admin audience and that client's role in the riz-admin
+  store (ADR 0004). A console login carries neither, so it reaches pages but every admin
+  call is 403; per-user admin identity is not built. The
   console is tested against a mock OIDC provider and a stubbed API; login against a real
   IdP and the real API is **unverified**.
 - Sign out ends the console session only; it lands on a static page and does not call the

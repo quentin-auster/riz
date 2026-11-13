@@ -33,6 +33,13 @@ applications:
 | auditor | `applications:read`, `models:read`, `audit:read` |
 | none, or application admin only | none: the workload keeps `check` on its bound applications and nothing else |
 
+**Only an admin token is elevated.** A client ID alone cannot tell a service account from a
+person signing in through the same client, so the issuer entry in `RIZ_OIDC_ISSUERS` takes
+an `adminAudience`, distinct from `audience`. A token is elevated only if it carries that
+audience, and with no `adminAudience` configured nothing is ever elevated. Configure the IdP
+to put it in tokens for the service accounts that administer riz, and never in user logins.
+A token with the admin audience but no role in the store gets nothing.
+
 Check requests are decided first and with the principal as authenticated, so the check
 path never waits on the admin store and an admin's reach never carries over to it. The API
 refuses to start in oidc mode without `RIZ_ADMIN_STORE_ID` and `RIZ_ADMIN_MODEL_ID`.

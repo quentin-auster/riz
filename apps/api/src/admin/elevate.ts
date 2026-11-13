@@ -34,8 +34,11 @@ export const adminSubject = (issuer: string, workload: string) =>
  */
 export function withAdminScopes(authorizer: AdminAuthorizer) {
   return async (principal: Principal): Promise<Principal> => {
-    // Only a verified workload token has an issuer; anything else keeps what it has.
-    if (!principal.issuer || !principal.clientId) return principal;
+    // Only a token minted for administration can hold admin roles: a user login for the same
+    // client carries the same client ID but not the admin audience.
+    if (!principal.admin || !principal.issuer || !principal.clientId) {
+      return principal;
+    }
     const subject = adminSubject(principal.issuer, principal.clientId);
     const [security, readApps, readAudit] = await Promise.all([
       authorizer.organization(subject, "security_admin"),

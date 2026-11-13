@@ -10,6 +10,7 @@ const AUDIENCE = "riz";
 
 let server: Server;
 let verify: TokenVerifier;
+let verifyWithAdmin: TokenVerifier;
 let privateKey: CryptoKey;
 let publicJwk: JWK;
 
@@ -23,12 +24,10 @@ before(async () => {
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const { port } = server.address() as AddressInfo;
-  verify = oidcTokenVerifier([
-    {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUri: `http://127.0.0.1:${port}/jwks`,
-    },
+  const jwksUri = `http://127.0.0.1:${port}/jwks`;
+  verify = oidcTokenVerifier([{ issuer: ISSUER, audience: AUDIENCE, jwksUri }]);
+  verifyWithAdmin = oidcTokenVerifier([
+    { issuer: ISSUER, audience: AUDIENCE, adminAudience: "riz-admin", jwksUri },
   ]);
 });
 
@@ -61,6 +60,32 @@ test("accepts a valid token and returns its issuer and subject", async () => {
   const verified = await verify(await sign());
   assert.equal(verified?.issuer, ISSUER);
   assert.equal(verified?.subject, "workload-a");
+});
+
+test("marks a token as admin only when it carries the admin audience", async () => {
+  assert.equal((await verifyWithAdmin(await sign()))?.admin, false);
+  assert.equal(
+    (await verifyWithAdmin(await sign({ aud: "riz-admin" })))?.admin,
+    true,
+  );
+  // Without an adminAudience configured, no token is ever admin.
+  assert.equal(await verify(await sign({ aud: "riz-admin" })), null);
+  assert.notEqual((await verify(await sign()))?.admin, true);
+});
+
+test("refuses an adminAudience equal to the audience", () => {
+  assert.throws(
+    () =>
+      oidcTokenVerifier([
+        {
+          issuer: ISSUER,
+          audience: AUDIENCE,
+          adminAudience: AUDIENCE,
+          jwksUri: "http://127.0.0.1:1/jwks",
+        },
+      ]),
+    /adminAudience must differ/,
+  );
 });
 
 test("rejects an expired token", async () => {

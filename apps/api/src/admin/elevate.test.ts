@@ -18,6 +18,7 @@ const workload = (name: string): Principal => ({
   applications: ["crm-prod"],
   clientId: name,
   issuer: "https://idp.example.test",
+  admin: true,
 });
 
 async function elevator() {
@@ -71,6 +72,17 @@ test("names a workload by the hash of its issuer and client ID", () => {
 
 test("a separator inside the issuer or client ID cannot make two workloads collide", () => {
   assert.notEqual(adminSubject("a|b", "c"), adminSubject("a", "b|c"));
+});
+
+test("a token without the admin audience is never elevated, whatever its client holds", async () => {
+  // The authorizer would grant everything; it must not even be asked.
+  const everything = {
+    organization: async () => {
+      throw new Error("the admin store must not be consulted");
+    },
+  } as unknown as Parameters<typeof withAdminScopes>[0];
+  const { admin: _admin, ...userLogin } = workload("ops");
+  assert.deepEqual(await withAdminScopes(everything)(userLogin), userLogin);
 });
 
 test(

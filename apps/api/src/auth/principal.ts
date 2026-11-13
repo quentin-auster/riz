@@ -8,6 +8,8 @@ export interface Principal {
   clientId?: string;
   /** The issuer that verified the token; set with `clientId`. */
   issuer?: string;
+  /** Set when the token was minted for administration (the issuer's `adminAudience`). */
+  admin?: true;
 }
 
 /**

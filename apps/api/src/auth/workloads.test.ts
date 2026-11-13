@@ -57,6 +57,22 @@ test("a workload is identified by azp, else client_id, else sub", async () => {
   assert.equal(await workloadOf({}), "sub-1");
 });
 
+test("a principal is admin only when its token was verified as admin", async () => {
+  const authenticateWith = (admin?: boolean) =>
+    workloadAuthenticator(
+      async () => ({
+        issuer: ISSUER,
+        subject: "sub-1",
+        claims: { azp: "ops" },
+        ...(admin === undefined ? {} : { admin }),
+      }),
+      async () => [],
+    );
+  assert.equal((await authenticateWith(true)("Bearer x"))?.admin, true);
+  assert.equal((await authenticateWith(false)("Bearer x"))?.admin, undefined);
+  assert.equal((await authenticateWith()("Bearer x"))?.admin, undefined);
+});
+
 test("an unbound workload is authenticated but reaches no application", async () => {
   const principal = await workloadAuthenticator(verifier({}), async () => [])(
     "Bearer good",

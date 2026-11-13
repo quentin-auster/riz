@@ -34,11 +34,19 @@ function issuersFromEnv(env: NodeJS.ProcessEnv): OidcIssuer[] {
       if (
         typeof i.issuer !== "string" ||
         typeof i.audience !== "string" ||
-        typeof i.jwksUri !== "string"
+        typeof i.jwksUri !== "string" ||
+        (i.adminAudience !== undefined && typeof i.adminAudience !== "string")
       ) {
         throw new Error();
       }
-      return { issuer: i.issuer, audience: i.audience, jwksUri: i.jwksUri };
+      return {
+        issuer: i.issuer,
+        audience: i.audience,
+        jwksUri: i.jwksUri,
+        ...(i.adminAudience === undefined
+          ? {}
+          : { adminAudience: i.adminAudience }),
+      };
     });
   } catch {
     throw new Error(

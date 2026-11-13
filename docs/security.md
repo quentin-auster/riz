@@ -126,7 +126,7 @@ path only; `redact` masks credential keys and bearer text; errors never echo cre
 
 ## Not mitigated or unverified
 
-- **Admin routes follow organization roles in the riz-admin store only** ([ADR 0004](decisions/0004-admin-authorization.md)) when `RIZ_AUTH_MODE=oidc`. Application-level admin roles are not enforced yet, and an admin role belongs to a client, so do not use an admin client for user logins.
+- **Admin routes follow organization roles in the riz-admin store only** ([ADR 0004](decisions/0004-admin-authorization.md)) when `RIZ_AUTH_MODE=oidc`. Application-level admin roles are not enforced yet, and an admin role belongs to a client and applies only to tokens carrying the issuer's `adminAudience`, so keep that audience out of user logins.
 - **A user token stays valid until `exp`** ([ADR 0003](decisions/0003-end-user-delegation.md)); a workload can present its own token as the user token and then checks as itself. Short token lifetimes are the control.
 - **OpenFGA's default consistency can be stale**; no test asserts how stale because it depends on its cache settings.
 - **The `higher_consistency` tests are weak on an uncached OpenFGA.** CI's OpenFGA has no check cache, so `revocation.test.ts` would still pass if riz stopped forwarding the consistency option. It proves the end-to-end answer, not that the option is forwarded.

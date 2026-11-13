@@ -22,6 +22,7 @@ import {
 // a local issuer; needs RIZ_DATABASE_URL and OPENFGA_API_URL. Real IdPs are unverified.
 const ISSUER = "https://idp.example.test";
 const AUDIENCE = "riz";
+const ADMIN_AUDIENCE = "riz-admin";
 
 let idp: Server;
 let api: RunningApi;
@@ -29,14 +30,17 @@ let call: Call;
 let key: CryptoKey;
 let jwksUri: string;
 
-const token = (workload: string, sub = "svc") =>
+const token = (workload: string, sub = "svc", audience = AUDIENCE) =>
   new SignJWT({ azp: workload })
     .setProtectedHeader({ alg: "RS256", kid: "k1" })
     .setIssuer(ISSUER)
-    .setAudience(AUDIENCE)
+    .setAudience(audience)
     .setSubject(sub)
     .setExpirationTime("5m")
     .sign(key);
+
+// What the IdP mints for a service account that administers riz.
+const adminToken = (workload: string) => token(workload, "svc", ADMIN_AUDIENCE);
 
 const oidcEnv = () => ({
   OPENFGA_API_URL: required("OPENFGA_API_URL"),
@@ -44,7 +48,12 @@ const oidcEnv = () => ({
   NODE_ENV: "development",
   RIZ_AUTH_MODE: "oidc",
   RIZ_OIDC_ISSUERS: JSON.stringify([
-    { issuer: ISSUER, audience: AUDIENCE, jwksUri },
+    {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      adminAudience: ADMIN_AUDIENCE,
+      jwksUri,
+    },
   ]),
 });
 
@@ -75,7 +84,7 @@ after(async () => {
 });
 
 test("a workload with an admin role registers an application and binds a model", async () => {
-  const ops = await token("ops");
+  const ops = await adminToken("ops");
   const name = unique("adm");
   const created = await call("POST", "/v1/applications", {
     token: ops,
@@ -125,7 +134,7 @@ test("a workload with an admin role registers an application and binds a model",
 });
 
 test("an admin workload's reach does not carry over to the check path", async () => {
-  const ops = await token("ops");
+  const ops = await adminToken("ops");
   const name = unique("adm");
   await call("POST", "/v1/applications", {
     token: ops,
@@ -164,7 +173,7 @@ test("a check-only workload is refused on every admin route", async () => {
 });
 
 test("an auditor workload reads but cannot register", async () => {
-  const reader = await token("reader");
+  const reader = await adminToken("reader");
   assert.equal(
     (await call("GET", "/v1/applications", { token: reader })).status,
     200,
@@ -181,12 +190,77 @@ test("an auditor workload reads but cannot register", async () => {
   );
 });
 
+test("an auditor workload is refused every mutating admin route", async () => {
+  const reader = await adminToken("reader");
+  for (const path of [
+    "/v1/models",
+    "/v1/models/rollback",
+    "/v1/relationships",
+    "/v1/workload-bindings",
+  ]) {
+    const res = await call("POST", path, { token: reader, body: {} });
+    assert.equal(res.status, 403, `POST ${path}`);
+  }
+  const unbind = await call("DELETE", "/v1/workload-bindings", {
+    token: reader,
+    body: {},
+  });
+  assert.equal(unbind.status, 403);
+});
+
+test("a user login for an admin client gets no admin access", async () => {
+  // Same client ID as the security admin, but minted for the ordinary audience.
+  const login = await token("ops");
+  for (const [method, path] of [
+    ["GET", "/v1/applications"],
+    ["GET", "/v1/audit"],
+    ["POST", "/v1/applications"],
+  ]) {
+    const res = await call(method as string, path as string, {
+      token: login,
+      ...(method === "GET"
+        ? {}
+        : { body: { name: unique("adm"), environment: "prod" } }),
+    });
+    assert.equal(res.status, 403, `${method} ${path}`);
+  }
+});
+
+test("the admin audience alone grants nothing without a role", async () => {
+  const res = await call("GET", "/v1/applications", {
+    token: await adminToken("crm-service"),
+  });
+  assert.equal(res.status, 403);
+});
+
 test("admin routes refuse an unauthenticated caller", async () => {
   assert.equal((await call("GET", "/v1/applications")).status, 401);
   assert.equal(
     (await call("GET", "/v1/applications", { token: "not-a-jwt" })).status,
     401,
   );
+});
+
+test("an admin-store outage fails admin routes closed but not unknown paths", async () => {
+  const broken = await startApi({
+    ...oidcEnv(),
+    RIZ_ADMIN_STORE_ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    RIZ_ADMIN_MODEL_ID: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  });
+  try {
+    const down = client(broken.url);
+    const ops = await adminToken("ops");
+    assert.equal(
+      (await down("GET", "/v1/applications", { token: ops })).status,
+      503,
+    );
+    assert.equal(
+      (await down("GET", "/v1/no-such-route", { token: ops })).status,
+      404,
+    );
+  } finally {
+    await broken.stop();
+  }
 });
 
 test("in oidc mode the API refuses to start without an admin store", async () => {
