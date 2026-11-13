@@ -17,11 +17,14 @@ const SECURITY_ADMIN = [
 ];
 
 /**
- * A workload's name in the riz-admin store. `<issuer>|<workload>` holds `:` and `/`, which
- * cannot be an OpenFGA user ID, so the store is keyed by its SHA-256 instead.
+ * A workload's name in the riz-admin store. An issuer URL holds `:` and `/`, which cannot be
+ * an OpenFGA user ID, so the store is keyed by the SHA-256 of the JSON pair (JSON, so no
+ * separator inside either value can make two pairs collide).
  */
-export const adminSubject = (workloadSubject: string) =>
-  createHash("sha256").update(workloadSubject).digest("hex");
+export const adminSubject = (issuer: string, workload: string) =>
+  createHash("sha256")
+    .update(JSON.stringify([issuer, workload]))
+    .digest("hex");
 
 /**
  * Adds the admin scopes a workload holds in the riz-admin store, on all applications.
@@ -31,7 +34,9 @@ export const adminSubject = (workloadSubject: string) =>
  */
 export function withAdminScopes(authorizer: AdminAuthorizer) {
   return async (principal: Principal): Promise<Principal> => {
-    const subject = adminSubject(principal.subject);
+    // Only a verified workload token has an issuer; anything else keeps what it has.
+    if (!principal.issuer || !principal.clientId) return principal;
+    const subject = adminSubject(principal.issuer, principal.clientId);
     const [security, readApps, readAudit] = await Promise.all([
       authorizer.organization(subject, "security_admin"),
       authorizer.organization(subject, "can_read_applications"),

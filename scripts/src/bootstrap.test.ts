@@ -8,7 +8,7 @@ test("names a workload as the API does, by the hash of issuer and client ID", ()
   // The same vector is pinned in apps/api/src/admin/elevate.test.ts; change both together.
   assert.equal(
     workloadSubject("https://idp.example.test", "ops"),
-    "1159fd3801ad737455c6986ea070400eee708c5b23a8cd3d139dea84e56339d0",
+    "159a4a0e1c6bdd49744b2d63187091850cc5e70d1e6cb0618d0c93e2a85906f2",
   );
 });
 

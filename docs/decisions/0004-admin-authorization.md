@@ -37,9 +37,12 @@ Check requests are decided first and with the principal as authenticated, so the
 path never waits on the admin store and an admin's reach never carries over to it. The API
 refuses to start in oidc mode without `RIZ_ADMIN_STORE_ID` and `RIZ_ADMIN_MODEL_ID`.
 
-A workload's name in the admin store is the SHA-256 (hex) of `<issuer>|<workload>`. The
-raw pair holds `:` and `/`, which an OpenFGA user ID cannot, and hashing keeps two issuers
-that issue the same client ID apart. The bootstrap command computes it.
+A workload's name in the admin store is the SHA-256 (hex) of the JSON array
+`[issuer, workload]`. The raw pair holds `:` and `/`, which an OpenFGA user ID cannot, and
+hashing keeps two issuers that issue the same client ID apart; JSON keeps a `|` in either
+value from making two pairs collide. The bootstrap command computes it. Only paths under
+`/v1/me`, `applications`, `audit`, `models`, `providers`, `relationships`,
+`workload-bindings` and `explorer` ask the admin store; unknown paths do not.
 
 ## Bootstrap the first security admin
 

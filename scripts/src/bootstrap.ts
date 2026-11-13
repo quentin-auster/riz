@@ -5,11 +5,14 @@ import { writeModel } from "./model.js";
 export const ADMIN_STORE_NAME = "riz-admin";
 
 /**
- * A workload's name in the admin store: the API keys it by the SHA-256 of `<issuer>|<workload>`
- * (apps/api/src/admin/elevate.ts), since the raw pair cannot be an OpenFGA user ID.
+ * A workload's name in the admin store: the API keys it by the SHA-256 of the JSON pair
+ * `[issuer, workload]` (apps/api/src/admin/elevate.ts), since the raw pair cannot be an
+ * OpenFGA user ID.
  */
 export const workloadSubject = (issuer: string, workload: string) =>
-  createHash("sha256").update(`${issuer}|${workload}`).digest("hex");
+  createHash("sha256")
+    .update(JSON.stringify([issuer, workload]))
+    .digest("hex");
 
 // Same shape the API accepts for a subject, since it is spliced into `user:<sub>`.
 const SUBJECT = /^[A-Za-z0-9._@+-]{1,128}$/;

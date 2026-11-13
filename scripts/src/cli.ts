@@ -25,13 +25,16 @@ const [command, relativeFile] = positionals;
 
 if (command === "bootstrap-admin") {
   // An oidc workload is named by the hash of its issuer and client ID, as the API computes it.
+  const named = Boolean(values.issuer && values.workload);
+  const partial = Boolean(values.issuer || values.workload) && !named;
   const admin =
     values.admin ??
-    (values.issuer && values.workload
-      ? workloadSubject(values.issuer, values.workload)
+    (named
+      ? workloadSubject(values.issuer ?? "", values.workload ?? "")
       : undefined);
   const apiUrl = values["api-url"] ?? process.env.OPENFGA_API_URL;
-  if (!admin || !apiUrl) {
+  const conflict = values.admin !== undefined && (named || partial);
+  if (!admin || !apiUrl || partial || conflict) {
     console.error(usage);
     process.exit(2);
   }

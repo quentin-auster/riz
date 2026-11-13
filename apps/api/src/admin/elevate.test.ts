@@ -17,6 +17,7 @@ const workload = (name: string): Principal => ({
   scopes: ["check"],
   applications: ["crm-prod"],
   clientId: name,
+  issuer: "https://idp.example.test",
 });
 
 async function elevator() {
@@ -37,7 +38,8 @@ async function elevator() {
   );
   assert.ok(modelId);
   const org = "organization:default";
-  const user = (name: string) => `user:${adminSubject(workload(name).subject)}`;
+  const user = (name: string) =>
+    `user:${adminSubject("https://idp.example.test", name)}`;
   await new OpenFgaClient({
     apiUrl: url,
     storeId,
@@ -62,9 +64,13 @@ async function elevator() {
 test("names a workload by the hash of its issuer and client ID", () => {
   // The same vector is pinned in scripts/src/bootstrap.test.ts; change both together.
   assert.equal(
-    adminSubject("https://idp.example.test|ops"),
-    "1159fd3801ad737455c6986ea070400eee708c5b23a8cd3d139dea84e56339d0",
+    adminSubject("https://idp.example.test", "ops"),
+    "159a4a0e1c6bdd49744b2d63187091850cc5e70d1e6cb0618d0c93e2a85906f2",
   );
+});
+
+test("a separator inside the issuer or client ID cannot make two workloads collide", () => {
+  assert.notEqual(adminSubject("a|b", "c"), adminSubject("a", "b|c"));
 });
 
 test(
@@ -115,6 +121,7 @@ test(
     const impostor = {
       ...workload("ops"),
       subject: "https://evil.example.test|ops",
+      issuer: "https://evil.example.test",
     };
     assert.deepEqual(await elevate(impostor), impostor);
   },

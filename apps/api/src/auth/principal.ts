@@ -6,6 +6,8 @@ export interface Principal {
   applications: readonly string[];
   /** The workload's verified client identity; set when it authenticated with a token. */
   clientId?: string;
+  /** The issuer that verified the token; set with `clientId`. */
+  issuer?: string;
 }
 
 /**

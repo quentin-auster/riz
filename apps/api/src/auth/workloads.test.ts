@@ -38,6 +38,7 @@ test("a verified workload gets the check scope and only its bound applications",
     scopes: ["check"],
     applications: ["crm-prod"],
     clientId: "crm-service",
+    issuer: ISSUER,
   });
   assert.deepEqual(seen, [[ISSUER, "crm-service"]]);
 });

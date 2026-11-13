@@ -127,6 +127,9 @@ if (!Number.isInteger(readyTimeoutMs) || readyTimeoutMs < 1) {
   throw new Error("RIZ_READY_TIMEOUT_MS must be a positive integer");
 }
 
+const ADMIN_PATH =
+  /^\/v1\/(me|applications|audit|models|providers|relationships|workload-bindings|explorer)(\/|$)/;
+
 const port = Number(process.env.PORT ?? 8080);
 createApp({
   authenticate,
@@ -138,6 +141,8 @@ createApp({
   routes: async (req, res, principal, url) => {
     // Checks first and with the caller as authenticated: the check path never waits on the admin store.
     if (await checks(req, res, principal, url)) return true;
+    // Unknown paths fall through to a 404 without asking the admin store.
+    if (!ADMIN_PATH.test(url.pathname)) return false;
     const admin = await withAdmin(principal);
     return (
       (await adminHandler(req, res, admin, url)) ||

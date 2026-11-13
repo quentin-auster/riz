@@ -262,7 +262,9 @@ export async function adminStore(
       authorizationModelId: modelId,
     }).write({
       writes: grants.map((g) => ({
-        user: `user:${createHash("sha256").update(`${g.issuer}|${g.workload}`).digest("hex")}`,
+        user: `user:${createHash("sha256")
+          .update(JSON.stringify([g.issuer, g.workload]))
+          .digest("hex")}`,
         relation: g.relation,
         object: "organization:default",
       })),
