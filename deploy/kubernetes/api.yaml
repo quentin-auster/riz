@@ -9,6 +9,9 @@ metadata:
 data:
   PORT: "8080"
   RIZ_AUTH_MODE: oidc
+  # On SIGTERM keep listening, unready, this long so the Service drops the pod before it
+  # refuses connections. The readiness probe below fails after 3 x 5s; keep this below 22000.
+  RIZ_SHUTDOWN_DELAY_MS: "10000"
   OPENFGA_API_URL: http://openfga.openfga.svc.cluster.local:8080
   # Workload and end-user token issuers. Replace with your identity provider.
   RIZ_OIDC_ISSUERS: >-

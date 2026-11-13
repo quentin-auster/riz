@@ -132,7 +132,7 @@ path only; `redact` masks credential keys and bearer text; errors never echo cre
 - **The `higher_consistency` tests are weak on an uncached OpenFGA.** CI's OpenFGA has no check cache, so `revocation.test.ts` would still pass if riz stopped forwarding the consistency option. It proves the end-to-end answer, not that the option is forwarded.
 - **A timed-out OpenFGA request is abandoned, not cancelled**, so a slow OpenFGA still receives the work.
 - **No rate limiting** and no shared state to hold one across replicas.
-- **The API image runs as root and does not handle SIGTERM**; the Kubernetes manifests assume uid 1000. Console sessions are in memory ([ADR 0006](decisions/0006-console-session.md)).
+- **The API image runs as root**; the Kubernetes manifests assume uid 1000. Console sessions are in memory ([ADR 0006](decisions/0006-console-session.md)).
 - **Unverified against real infrastructure:** a real identity provider (the tests use a local issuer), a real Databricks workspace (`test_unverified_real_unity_catalog_denies_a_user_without_a_grant` is skipped), console login against a real IdP, and applying the Kubernetes manifests to a cluster.
 - **The fault injection is a TCP proxy** in the test process, not a compose profile. It cuts or blackholes connections but does not model a database that answers wrongly.
 

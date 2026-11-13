@@ -36,6 +36,7 @@ The main environment variables of the API:
 | `RIZ_OIDC_ISSUERS` | Required for `oidc`: a JSON array of `{issuer, audience, jwksUri}`. |
 | `RIZ_FIXTURE_AUTH_FILE`, `RIZ_FIXTURE_END_USERS_FILE` | Fixture mode only: the dev token files. |
 | `RIZ_CHECK_TIMEOUT_MS`, `RIZ_BATCH_MAX`, `RIZ_READY_TIMEOUT_MS` | Check deadline, batch size cap, readiness probe deadline. |
+| `RIZ_SHUTDOWN_DELAY_MS` | Optional, 0 to 22000, default 0: how long to stay up but unready after SIGTERM before refusing connections. |
 | `PORT` | Listen port. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `RIZ_METRICS_PORT`, `RIZ_METRICS_HOST` | Optional tracing and metrics ([ADR 0008](decisions/0008-observability.md)). The metrics port is unauthenticated: keep it on the monitoring network. |
 
@@ -55,6 +56,15 @@ two and include an example HPA (needs metrics-server). Health routes:
 - `/health/live`: process is up; no dependencies. Restart on failure.
 - `/health/ready`: Postgres and OpenFGA reachable. Remove from the load balancer on
   failure; do not restart.
+
+**Shutdown.** On SIGTERM (or SIGINT) the API reports unready for `RIZ_SHUTDOWN_DELAY_MS`
+(default 0) while still accepting, so the load balancer can drop it. Then it stops
+accepting, waits for in-flight requests, closes the database pool and exits. All of this
+fits in 25 seconds: requests still running at the deadline are cut. Keep
+`terminationGracePeriodSeconds` above 25 (the Kubernetes default is 30). The manifests set
+the delay to 10 s, but the readiness probe (5 s x 3 failures) can take up to 15 s to remove
+the pod, so a few requests may still be refused at the end; clients should retry idempotent
+calls. With a delay of 0 (compose, local) every new connection is refused at once.
 
 The console is **one replica**: its sessions are in memory ([ADR 0006](decisions/0006-console-session.md)).
 Throughput is bounded mainly by OpenFGA and Postgres, not by the API; see
