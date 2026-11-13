@@ -1042,6 +1042,9 @@ components:
             $ref: "#/components/schemas/BatchCheckResult"
     ApplicationCreate:
       type: object
+      description: |
+        `name`, a hyphen and `environment` together must be at most 63 characters,
+        the longest `ApplicationId`; a longer pair is `400 invalid_request`.
       additionalProperties: false
       required: [name, environment]
       properties:

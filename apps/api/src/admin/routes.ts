@@ -81,6 +81,14 @@ function createBody(body: unknown): { name: string; environment: string } {
       "Body must be {name, environment} with valid values.",
     );
   }
+  // The ID is `${name}-${environment}`, and every route accepts an ID of at most 63.
+  if (b.name.length + 1 + b.environment.length > 63) {
+    throw new HttpError(
+      400,
+      "invalid_request",
+      "name and environment together must be at most 62 characters.",
+    );
+  }
   return { name: b.name, environment: b.environment };
 }
 

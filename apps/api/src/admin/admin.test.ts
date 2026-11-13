@@ -147,6 +147,28 @@ test(
 );
 
 test(
+  "an application ID registers only if the check routes can accept it",
+  opts,
+  () =>
+    withApp(async (call, _pool, lookup) => {
+      const longest = await call("admin", "POST", "/v1/applications", {
+        name: "a".repeat(58),
+        environment: "prod",
+      });
+      assert.equal(longest.status, 201);
+      assert.equal(longest.body.id.length, 63);
+      const resolver = createResolver(lookup, apiUrl as string);
+      assert.ok(await resolver.resolve(longest.body.id));
+
+      const tooLong = await call("admin", "POST", "/v1/applications", {
+        name: "a".repeat(59),
+        environment: "prod",
+      });
+      assert.equal(tooLong.status, 400);
+    }),
+);
+
+test(
   "an unknown application is 404, and so is one outside the caller's allow-list",
   opts,
   () =>
