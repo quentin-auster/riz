@@ -15,8 +15,10 @@ The console has no health route and uses TCP probes.
 
 ## Before applying
 
-1. Edit the placeholders in the two ConfigMaps: `OPENFGA_API_URL`, `RIZ_OIDC_ISSUERS`, and
-   the console's `OIDC_*` values. Hosts ending in `.invalid` are placeholders.
+1. Edit the placeholders in the two ConfigMaps: `OPENFGA_API_URL`, `RIZ_OIDC_ISSUERS`,
+   `RIZ_ADMIN_STORE_ID` and `RIZ_ADMIN_MODEL_ID` (from `bootstrap-admin`, see
+   [ADR 0004](../../docs/decisions/0004-admin-authorization.md)), and the console's `OIDC_*`
+   values. Hosts ending in `.invalid` are placeholders.
 2. Build and publish the images (`deploy/api.Dockerfile`, `deploy/console.Dockerfile`) and
    change the `image:` fields, or load local ones as below.
 3. Create the secrets. Nothing secret is committed:

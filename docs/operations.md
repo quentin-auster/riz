@@ -19,12 +19,14 @@ Postgres). The API (`riz-api`) and console (`riz-console`) are the only riz proc
 | Local | `make up` (Docker Compose: postgres, openfga, api `:8080`, console `:3000`) | Fixture authentication and dev-only tokens; never expose it. |
 | Kubernetes | `deploy/kubernetes/` ([README](../deploy/kubernetes/README.md)) | Edit the placeholder ConfigMap values, create the two secrets, then apply. |
 
-**Admin endpoints are not reachable in production yet.** Under `RIZ_AUTH_MODE=oidc` every
-token receives only the `check` scope, so the administrative endpoints (applications,
-relationships, models, workload bindings, audit) return 403; only fixture authentication
-grants admin scopes ([ADR 0004](decisions/0004-admin-authorization.md),
-[ADR 0006](decisions/0006-console-session.md)). The procedures below that call those
-endpoints describe the API, but cannot be run against an `oidc` deployment today.
+**Administering riz under `RIZ_AUTH_MODE=oidc`.** A workload token carries only the `check`
+scope. Administrative endpoints (applications, relationships, models, workload bindings,
+audit) return 403 to it unless its token carries the issuer's `adminAudience` and the
+workload holds a role in the `riz-admin` store, which
+you create once with `bootstrap-admin --issuer <issuer> --workload <client id>`
+([ADR 0004](decisions/0004-admin-authorization.md)). Only `security_admin` and `auditor`
+roles are enforced; an application-level admin gets no admin access yet. The console's
+sign-in is separate ([ADR 0006](decisions/0006-console-session.md)).
 
 The main environment variables of the API:
 
@@ -33,7 +35,8 @@ The main environment variables of the API:
 | `RIZ_DATABASE_URL` | Postgres URL for the `riz` database (a separate role from OpenFGA's). Required. |
 | `OPENFGA_API_URL` | OpenFGA base URL. Required. |
 | `RIZ_AUTH_MODE` | Required: `oidc` for production, `fixture` for local only. Fixture mode with `NODE_ENV=production` stops the process; the image defaults to production. |
-| `RIZ_OIDC_ISSUERS` | Required for `oidc`: a JSON array of `{issuer, audience, jwksUri}`. |
+| `RIZ_OIDC_ISSUERS` | Required for `oidc`: a JSON array of `{issuer, audience, jwksUri}`, plus an optional `adminAudience` (different from `audience`). Only tokens carrying `adminAudience` can administer riz; without it no workload can. |
+| `RIZ_ADMIN_STORE_ID`, `RIZ_ADMIN_MODEL_ID` | Required for `oidc`: the `riz-admin` store and its pinned model, printed by `bootstrap-admin`. The API does not start without them. |
 | `RIZ_FIXTURE_AUTH_FILE`, `RIZ_FIXTURE_END_USERS_FILE` | Fixture mode only: the dev token files. |
 | `RIZ_CHECK_TIMEOUT_MS`, `RIZ_BATCH_MAX`, `RIZ_READY_TIMEOUT_MS` | Check deadline, batch size cap, readiness probe deadline. |
 | `PORT` | Listen port. |

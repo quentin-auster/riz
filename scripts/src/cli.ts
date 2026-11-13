@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { bootstrapAdmin } from "./bootstrap.js";
+import { bootstrapAdmin, workloadSubject } from "./bootstrap.js";
 import { validateExtension, writeExtension } from "./extension.js";
 import { validateModel, writeModel } from "./model.js";
 
@@ -9,7 +9,7 @@ const usage = `usage:
   pnpm model validate-extension <extension.fga>   (core + extension, both suites)
   pnpm model write-extension <extension.fga> --store-id <id> [--api-url <url>]
   pnpm model write <model.fga> --store-id <id> [--api-url <url>]   (default OPENFGA_API_URL)
-  pnpm model bootstrap-admin --admin <subject> [--api-url <url>]   (default OPENFGA_API_URL)`;
+  pnpm model bootstrap-admin (--issuer <iss> --workload <id> | --admin <subject>) [--api-url <url>]   (default OPENFGA_API_URL)`;
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
@@ -17,14 +17,24 @@ const { positionals, values } = parseArgs({
     "store-id": { type: "string" },
     "api-url": { type: "string" },
     admin: { type: "string" },
+    issuer: { type: "string" },
+    workload: { type: "string" },
   },
 });
 const [command, relativeFile] = positionals;
 
 if (command === "bootstrap-admin") {
-  const admin = values.admin;
+  // An oidc workload is named by the hash of its issuer and client ID, as the API computes it.
+  const named = Boolean(values.issuer && values.workload);
+  const partial = Boolean(values.issuer || values.workload) && !named;
+  const admin =
+    values.admin ??
+    (named
+      ? workloadSubject(values.issuer ?? "", values.workload ?? "")
+      : undefined);
   const apiUrl = values["api-url"] ?? process.env.OPENFGA_API_URL;
-  if (!admin || !apiUrl) {
+  const conflict = values.admin !== undefined && (named || partial);
+  if (!admin || !apiUrl || partial || conflict) {
     console.error(usage);
     process.exit(2);
   }

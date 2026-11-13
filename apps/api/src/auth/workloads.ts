@@ -38,6 +38,8 @@ export function workloadAuthenticator(
       scopes: ["check"],
       applications: await lookup(verified.issuer, workload),
       clientId: workload,
+      issuer: verified.issuer,
+      ...(verified.admin ? { admin: true as const } : {}),
     };
   };
 }

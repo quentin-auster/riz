@@ -5,6 +5,7 @@ import { after, before, test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import {
   ALICE_READS,
+  adminStore,
   type Call,
   client,
   fixtureFiles,
@@ -68,6 +69,7 @@ before(async () => {
   setup = client(setupApi.url);
   oidcApi = await startApi({
     ...common,
+    ...(await adminStore()),
     NODE_ENV: "development",
     RIZ_AUTH_MODE: "oidc",
     RIZ_OIDC_ISSUERS: JSON.stringify([

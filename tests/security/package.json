@@ -8,6 +8,8 @@
     "test:security": "tsx --test --test-concurrency=1 *.test.ts"
   },
   "devDependencies": {
+    "@openfga/sdk": "0.9.7",
+    "@openfga/syntax-transformer": "0.2.2",
     "@types/node": "22.18.10",
     "jose": "6.2.14",
     "tsx": "4.20.6",

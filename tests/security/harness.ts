@@ -1,9 +1,11 @@
 import { type ChildProcess, spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { connect, createServer, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { OpenFgaClient } from "@openfga/sdk";
+import { transformer } from "@openfga/syntax-transformer";
 
 // Black-box harness for the security suite: it starts the real API process (apps/api/src/index.ts)
 // against the Postgres and OpenFGA in RIZ_DATABASE_URL and OPENFGA_API_URL, so what is tested is
@@ -229,3 +231,44 @@ export const readDoc = (application: string, extra: object = {}) => ({
   object: "document:d1",
   ...extra,
 });
+
+/**
+ * A riz-admin store at the repo's admin model holding `grants`, as the env the API needs in oidc mode.
+ * A workload is named by the SHA-256 of `<issuer>|<workload>`, computed here independently of the API.
+ */
+export async function adminStore(
+  grants: { issuer: string; workload: string; relation: string }[] = [],
+) {
+  const apiUrl = required("OPENFGA_API_URL");
+  const { id: storeId } = await new OpenFgaClient({ apiUrl }).createStore({
+    name: "riz-admin-security-test",
+  });
+  const { authorization_model_id: modelId } = await new OpenFgaClient({
+    apiUrl,
+    storeId,
+  }).writeAuthorizationModel(
+    transformer.transformDSLToJSONObject(
+      readFileSync(
+        join(import.meta.dirname, "../../models/openfga/riz-admin.fga"),
+        "utf8",
+      ),
+    ),
+  );
+  if (!modelId) throw new Error("OpenFGA did not return a model id");
+  if (grants.length > 0) {
+    await new OpenFgaClient({
+      apiUrl,
+      storeId,
+      authorizationModelId: modelId,
+    }).write({
+      writes: grants.map((g) => ({
+        user: `user:${createHash("sha256")
+          .update(JSON.stringify([g.issuer, g.workload]))
+          .digest("hex")}`,
+        relation: g.relation,
+        object: "organization:default",
+      })),
+    });
+  }
+  return { RIZ_ADMIN_STORE_ID: storeId, RIZ_ADMIN_MODEL_ID: modelId };
+}
