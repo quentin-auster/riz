@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ConsistencyPreference } from "@openfga/sdk";
+import { ConsistencyPreference, OpenFgaClient } from "@openfga/sdk";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
 import type { Principal } from "../auth/index.js";
@@ -121,6 +121,10 @@ async function withApp(
         pool,
         lookup: dbLookup(pool),
         apiUrl: apiUrl as string,
+        core: readFileSync(
+          join(import.meta.dirname, "../../../../models/openfga/core.fga"),
+          "utf8",
+        ),
       }),
     ),
   });
@@ -424,5 +428,115 @@ test(
           .status,
         404,
       );
+    }),
+);
+
+const extensionBody = (extension: string) => ({
+  application: "crm-prod",
+  extension,
+  tuples: [
+    { subject: "user:olga", relation: "admin", object: "organization:acme" },
+    {
+      subject: "organization:acme",
+      relation: "organization",
+      object: "application:crm",
+    },
+    {
+      subject: "organization:acme",
+      relation: "organization",
+      object: "folder:f",
+    },
+    { subject: "user:pat", relation: "owner", object: "folder:f" },
+  ],
+  assertions: [
+    // The extension builds on a central role...
+    {
+      subject: "user:olga",
+      relation: "owner",
+      object: "folder:f",
+      allowed: true,
+    },
+    // ...and is finer-grained than it.
+    {
+      subject: "user:pat",
+      relation: "owner",
+      object: "folder:f",
+      allowed: true,
+    },
+    {
+      subject: "user:bob",
+      relation: "owner",
+      object: "folder:f",
+      allowed: false,
+    },
+  ],
+});
+const folderExtension = `type folder
+  relations
+    define owner: [user] or admin from organization
+    define organization: [organization]
+`;
+
+test(
+  "an extension on the core is bound, and one that redeclares a core type is refused",
+  opts,
+  () =>
+    withApp(async ({ call, pool, activeModel }) => {
+      const before = await activeModel("crm-prod");
+
+      const refused = await call(
+        "crmAdmin",
+        "/v1/models",
+        extensionBody(`type organization
+  relations
+    define admin: [user, user:*]
+`),
+      );
+      assert.equal(refused.status, 422);
+      assert.equal(refused.body?.code, "core_violation");
+      assert.equal(await activeModel("crm-prod"), before);
+
+      const bound = await call(
+        "crmAdmin",
+        "/v1/models",
+        extensionBody(folderExtension),
+      );
+      assert.equal(bound.status, 201);
+      assert.equal(await activeModel("crm-prod"), bound.body?.id);
+      assert.equal((await modelEvents(pool)).rows.length, 1);
+    }),
+);
+
+test(
+  "rollback refuses a model bound earlier that does not keep the core",
+  opts,
+  () =>
+    withApp(async ({ call, pool, activeModel }) => {
+      const active = await activeModel("crm-prod");
+      // A model that predates the core guard: anyone may be an organization admin.
+      const weakened = base.replace(
+        "define admin: [user]\n    define member",
+        "define admin: [user, user:*]\n    define member",
+      );
+      assert.notEqual(weakened, base);
+      const found = await dbLookup(pool)("crm-prod");
+      const { authorization_model_id: legacy } = await new OpenFgaClient({
+        apiUrl: apiUrl as string,
+        storeId: (found as { storeId: string }).storeId,
+      }).writeAuthorizationModel(
+        transformer.transformDSLToJSONObject(weakened),
+      );
+      await pool.query(
+        "INSERT INTO model_bindings (application_id, model_id, active) VALUES ('crm-prod', $1, false)",
+        [legacy],
+      );
+
+      const res = await call("crmAdmin", "/v1/models/rollback", {
+        application: "crm-prod",
+        modelId: legacy,
+      });
+      assert.equal(res.status, 422);
+      assert.equal(res.body?.code, "core_violation");
+      assert.equal(await activeModel("crm-prod"), active);
     }),
 );

@@ -99,6 +99,10 @@ const modelsHandler = modelRoutes(
     pool,
     lookup: dbLookup(pool),
     apiUrl: required("OPENFGA_API_URL"),
+    core: readFileSync(
+      join(import.meta.dirname, "../../../models/openfga/core.fga"),
+      "utf8",
+    ),
   }),
 );
 const bindingsHandler = workloadRoutes(bindings);

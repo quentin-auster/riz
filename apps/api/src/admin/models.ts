@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { ConsistencyPreference, OpenFgaClient } from "@openfga/sdk";
 import { transformer } from "@openfga/syntax-transformer";
 import type pg from "pg";
@@ -20,6 +21,8 @@ export interface Assertion extends Relationship {
 export class InvalidModel extends Error {}
 /** The model parsed, but its assertions do not hold; the binding is not changed. */
 export class AssertionsFailed extends Error {}
+/** The model drops, repeats or changes a core type, which only riz may define. */
+export class CoreViolated extends Error {}
 export class ModelNotFound extends Error {}
 export class ModelAlreadyActive extends Error {}
 
@@ -41,26 +44,92 @@ export function createModelService(deps: {
   pool: pg.Pool;
   lookup: Lookup;
   apiUrl: string;
+  /**
+   * The riz core model (DSL). When set, every submitted model must contain each core
+   * type exactly once and unchanged, and an application may submit just an extension.
+   */
+  core?: string;
 }) {
-  const { pool, lookup, apiUrl } = deps;
+  const { pool, lookup, apiUrl, core } = deps;
+
+  type ModelJson = ReturnType<typeof transformer.transformDSLToJSONObject>;
+  const coreTypes =
+    core === undefined
+      ? []
+      : transformer.transformDSLToJSONObject(core).type_definitions;
+  // An empty core would enforce nothing, which must fail at startup, not open the guard.
+  if (core !== undefined && coreTypes.length === 0) {
+    throw new Error("The core model defines no types");
+  }
+  // The guard proves a core type unchanged only if it depends on nothing outside the core.
+  const coreNames = new Set(coreTypes.map((t) => t.type));
+  for (const t of coreTypes) {
+    for (const rel of Object.values(t.metadata?.relations ?? {})) {
+      for (const d of rel.directly_related_user_types ?? []) {
+        if (!coreNames.has(d.type)) {
+          throw new Error(
+            `Core type ${t.type} references non-core type ${d.type}`,
+          );
+        }
+      }
+    }
+  }
+
+  function parse(dsl: string): ModelJson {
+    try {
+      return transformer.transformDSLToJSONObject(dsl);
+    } catch (err) {
+      throw new InvalidModel(
+        `Model does not parse: ${String(err).slice(0, 200)}`,
+      );
+    }
+  }
+
+  /** An extension is types only; the core is prepended so it can reference core types. */
+  function compose(input: {
+    model?: string | undefined;
+    extension?: string | undefined;
+  }): string {
+    if (input.extension === undefined) return input.model as string;
+    if (!core) {
+      throw new InvalidModel("This deployment has no core model to extend.");
+    }
+    if (/^\s*model\b/m.test(input.extension)) {
+      throw new InvalidModel(
+        "An extension holds types only, with no model header.",
+      );
+    }
+    return `${core}\n${input.extension}`;
+  }
+
+  /**
+   * Judged on the parsed model, so formatting cannot hide a change. A core type that
+   * is present once and unchanged cannot be altered by other types, because core types
+   * reference only core types.
+   */
+  function assertCoreIntact(json: ModelJson): void {
+    const broken = coreTypes
+      .filter((c) => {
+        const same = json.type_definitions.filter((t) => t.type === c.type);
+        return same.length !== 1 || !isDeepStrictEqual(same[0], c);
+      })
+      .map((c) => c.type);
+    if (broken.length) {
+      throw new CoreViolated(
+        `Core type(s) missing, repeated or changed: ${broken.join(", ")}`,
+      );
+    }
+  }
 
   /**
    * Runs the assertions against the candidate in a scratch store, so neither a failing
    * model nor the assertion tuples ever touch the application's store.
    */
   async function runAssertions(
-    dsl: string,
+    json: ModelJson,
     tuples: Relationship[],
     assertions: Assertion[],
   ): Promise<void> {
-    let json: ReturnType<typeof transformer.transformDSLToJSONObject>;
-    try {
-      json = transformer.transformDSLToJSONObject(dsl);
-    } catch (err) {
-      throw new InvalidModel(
-        `Model does not parse: ${String(err).slice(0, 200)}`,
-      );
-    }
     const invalid = (m: string) => new InvalidModel(m);
 
     const { id: storeId } = await fga(
@@ -183,49 +252,59 @@ export function createModelService(deps: {
     }
   }
 
+  /** A model this application has been bound to, as stored. */
+  async function stored(application: string, modelId: string) {
+    const found = await lookup(application);
+    if (!found) throw new ApplicationNotFound(application);
+    // Only models bound to this application: its store may hold others.
+    const known = await pool.query(
+      "SELECT 1 FROM model_bindings WHERE application_id = $1 AND model_id = $2",
+      [application, modelId],
+    );
+    if (!known.rowCount) throw new ModelNotFound();
+    const { authorization_model: model } = await fga(
+      () =>
+        new OpenFgaClient({
+          apiUrl,
+          storeId: found.storeId,
+        }).readAuthorizationModel({ authorizationModelId: modelId }),
+      (m) => new InvalidModel(m),
+    );
+    if (!model) throw new ModelNotFound();
+    return model;
+  }
+
   return {
     /** The DSL of a model this application has been bound to, for comparing versions. */
     async read(application: string, modelId: string): Promise<string> {
-      const found = await lookup(application);
-      if (!found) throw new ApplicationNotFound(application);
-      // Only models bound to this application: its store may hold others.
-      const known = await pool.query(
-        "SELECT 1 FROM model_bindings WHERE application_id = $1 AND model_id = $2",
-        [application, modelId],
-      );
-      if (!known.rowCount) throw new ModelNotFound();
-      const { authorization_model: model } = await fga(
-        () =>
-          new OpenFgaClient({
-            apiUrl,
-            storeId: found.storeId,
-          }).readAuthorizationModel({ authorizationModelId: modelId }),
-        (m) => new InvalidModel(m),
-      );
-      if (!model) throw new ModelNotFound();
-      return transformer.transformJSONToDSL(model);
+      return transformer.transformJSONToDSL(await stored(application, modelId));
     },
 
     /** Validate, assert, write a new immutable model, then bind it. The prior row stays as history. */
     async submit(
       actor: string,
       application: string,
-      input: { model: string; tuples: Relationship[]; assertions: Assertion[] },
+      input: {
+        model?: string | undefined;
+        extension?: string | undefined;
+        tuples: Relationship[];
+        assertions: Assertion[];
+      },
       requestId?: string,
     ): Promise<ModelEntry> {
       const found = await lookup(application);
       if (!found) throw new ApplicationNotFound(application);
 
-      await runAssertions(input.model, input.tuples, input.assertions);
+      const json = parse(compose(input));
+      assertCoreIntact(json);
+      await runAssertions(json, input.tuples, input.assertions);
 
       const { authorization_model_id: modelId } = await fga(
         () =>
           new OpenFgaClient({
             apiUrl,
             storeId: found.storeId,
-          }).writeAuthorizationModel(
-            transformer.transformDSLToJSONObject(input.model),
-          ),
+          }).writeAuthorizationModel(json),
         (m) => new InvalidModel(m),
       );
       if (!modelId) {
@@ -239,13 +318,23 @@ export function createModelService(deps: {
       return bind(actor, application, modelId, "models.bind", requestId, false);
     },
 
-    /** Re-binds a model this application has been bound to before. */
+    /**
+     * Re-binds a model this application has been bound to before, if it keeps the core:
+     * a model bound before the core existed, or under an older core, is not restored.
+     */
     async rollback(
       actor: string,
       application: string,
       modelId: string,
       requestId?: string,
     ): Promise<ModelEntry> {
+      if (core) {
+        // A stored model carries server defaults; the DSL round trip gives the parsed form.
+        const dsl = transformer.transformJSONToDSL(
+          await stored(application, modelId),
+        );
+        assertCoreIntact(parse(dsl));
+      }
       return bind(
         actor,
         application,

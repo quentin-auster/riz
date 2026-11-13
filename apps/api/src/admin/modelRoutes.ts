@@ -5,6 +5,7 @@ import { HttpError, readJson, requestIdOf, send } from "../http.js";
 import {
   type Assertion,
   AssertionsFailed,
+  CoreViolated,
   InvalidModel,
   ModelAlreadyActive,
   ModelNotFound,
@@ -38,11 +39,18 @@ function submitBody(body: unknown) {
     typeof b !== "object" ||
     b === null ||
     Object.keys(b).some(
-      (k) => !["application", "model", "tuples", "assertions"].includes(k),
+      (k) =>
+        !["application", "model", "extension", "tuples", "assertions"].includes(
+          k,
+        ),
     ) ||
-    typeof b.model !== "string" ||
-    b.model.length < 1 ||
-    b.model.length > MAX_MODEL_CHARS ||
+    // Exactly one of a full model or a core extension.
+    (b.model === undefined) === (b.extension === undefined) ||
+    [b.model, b.extension].some(
+      (v) =>
+        v !== undefined &&
+        (typeof v !== "string" || v.length < 1 || v.length > MAX_MODEL_CHARS),
+    ) ||
     (b.tuples !== undefined &&
       (!Array.isArray(b.tuples) || b.tuples.length > MAX_TUPLES)) ||
     !Array.isArray(b.assertions) ||
@@ -50,7 +58,7 @@ function submitBody(body: unknown) {
     b.assertions.length > MAX_ASSERTIONS
   ) {
     throw invalid(
-      "Body must be {application, model, tuples?[0..100], assertions[1..200]}.",
+      "Body must be {application, model | extension, tuples?[0..100], assertions[1..200]}.",
     );
   }
   const assertions = b.assertions.map(toAssertion);
@@ -63,7 +71,8 @@ function submitBody(body: unknown) {
   }
   return {
     application: applicationOf(b.application),
-    model: b.model,
+    model: b.model as string | undefined,
+    extension: b.extension as string | undefined,
     tuples: (b.tuples ?? []).map(toRelationship),
     assertions,
   };
@@ -78,6 +87,9 @@ function translate(err: unknown): unknown {
   }
   if (err instanceof AssertionsFailed) {
     return new HttpError(422, "assertions_failed", err.message);
+  }
+  if (err instanceof CoreViolated) {
+    return new HttpError(422, "core_violation", err.message);
   }
   if (err instanceof ModelNotFound) {
     return new HttpError(404, "not_found", "Model not found.");

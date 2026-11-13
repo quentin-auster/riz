@@ -19,6 +19,9 @@ if the caller's own assertions hold:
 (`models.rollback`). Earlier `model_bindings` rows are kept, so history is the table
 itself. A model riz has never bound to the application cannot be restored.
 
+The submission may be a full `model` or an `extension` composed after the riz core; either
+must keep every core type unchanged, else 422 `core_violation` (ADR 0011).
+
 Scope: `models:write`, plus the application allow-list, decided before the application is
 looked up (403, not 404). Other applications are never touched.
 
