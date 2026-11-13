@@ -1,4 +1,10 @@
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { OpenFgaClient } from "@openfga/sdk";
@@ -7,7 +13,8 @@ import { validateModel } from "./model.js";
 
 const CORE_FILE = resolve(import.meta.dirname, "../../models/openfga/core.fga");
 
-const testsFor = (modelFile: string) => modelFile.replace(/\.fga$/, ".tests.yaml");
+const testsFor = (modelFile: string) =>
+  modelFile.replace(/\.fga$/, ".tests.yaml");
 
 /**
  * Composes the riz core model with an application's extension (types only) and
@@ -23,18 +30,23 @@ export function validateExtension(
   const extension = readFileSync(extPath, "utf8");
 
   if (/^\s*model\b/m.test(extension)) {
-    throw new Error(`${basename(extPath)} must hold types only, without a model header`);
+    throw new Error(
+      `${basename(extPath)} must hold types only, without a model header`,
+    );
   }
   // Judge the parsed model, not the source text: indentation must not hide a redeclaration.
   const seen = new Set<string>();
   const clash = new Set<string>();
-  for (const { type } of transformer.transformDSLToJSONObject(`${core}\n${extension}`)
-    .type_definitions) {
+  for (const { type } of transformer.transformDSLToJSONObject(
+    `${core}\n${extension}`,
+  ).type_definitions) {
     if (seen.has(type)) clash.add(type);
     seen.add(type);
   }
   if (clash.size > 0) {
-    throw new Error(`${basename(extPath)} redeclares a type: ${[...clash].join(", ")}`);
+    throw new Error(
+      `${basename(extPath)} redeclares a type: ${[...clash].join(", ")}`,
+    );
   }
 
   let model: ReturnType<typeof validateModel> | undefined;
@@ -46,7 +58,10 @@ export function validateExtension(
       writeFileSync(join(dir, "model.fga"), `${core}\n${extension}`);
       writeFileSync(
         join(dir, "tests.yaml"),
-        readFileSync(tests, "utf8").replace(/^model_file:.*$/m, "model_file: ./model.fga"),
+        readFileSync(tests, "utf8").replace(
+          /^model_file:.*$/m,
+          "model_file: ./model.fga",
+        ),
       );
       model = validateModel(join(dir, "model.fga"));
     } finally {
@@ -62,7 +77,9 @@ export async function writeExtension(
   target: { apiUrl: string; storeId: string },
 ): Promise<string> {
   const model = validateExtension(extensionFile);
-  const { authorization_model_id } = await new OpenFgaClient(target).writeAuthorizationModel(model);
+  const { authorization_model_id } = await new OpenFgaClient(
+    target,
+  ).writeAuthorizationModel(model);
   if (!authorization_model_id) {
     throw new Error("OpenFGA did not return an authorization_model_id");
   }

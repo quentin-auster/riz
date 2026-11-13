@@ -35,7 +35,10 @@ test("rejects an extension that redeclares a core type", () => {
   relations
     define admin: [user]
 `);
-  assert.throws(() => validateExtension(file), /redeclares a type: organization/);
+  assert.throws(
+    () => validateExtension(file),
+    /redeclares a type: organization/,
+  );
 });
 
 test("rejects an indented redeclaration of a core type", () => {
@@ -43,7 +46,10 @@ test("rejects an indented redeclaration of a core type", () => {
     relations
       define admin: [user, user:*]
 `);
-  assert.throws(() => validateExtension(file), /redeclares a type: organization/);
+  assert.throws(
+    () => validateExtension(file),
+    /redeclares a type: organization/,
+  );
 });
 
 test("rejects an extension that carries its own model header", () => {
@@ -91,7 +97,10 @@ tests:
   relations
     define owner: [user]
 `);
-  assert.throws(() => validateExtension(file, join(dir, "core.fga")), /assertions failed/);
+  assert.throws(
+    () => validateExtension(file, join(dir, "core.fga")),
+    /assertions failed/,
+  );
 });
 
 test("rejects an extension whose assertions fail", () => {
