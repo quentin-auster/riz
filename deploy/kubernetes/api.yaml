@@ -10,6 +10,9 @@ data:
   PORT: "8080"
   RIZ_AUTH_MODE: oidc
   OPENFGA_API_URL: http://openfga.openfga.svc.cluster.local:8080
+  # Printed by `bootstrap-admin` (docs/decisions/0004-admin-authorization.md). The API will not start without them.
+  RIZ_ADMIN_STORE_ID: replace-with-the-riz-admin-store-id
+  RIZ_ADMIN_MODEL_ID: replace-with-the-riz-admin-model-id
   # Workload and end-user token issuers. Replace with your identity provider.
   RIZ_OIDC_ISSUERS: >-
     [{"issuer":"https://idp.example.invalid/","audience":"riz","jwksUri":"https://idp.example.invalid/.well-known/jwks.json"}]

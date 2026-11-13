@@ -2,6 +2,7 @@ import { OpenFgaClient } from "@openfga/sdk";
 import { HttpError } from "../http.js";
 
 export type OrganizationRelation =
+  | "security_admin"
   | "can_register_application"
   | "can_manage_bindings"
   | "can_read_applications"

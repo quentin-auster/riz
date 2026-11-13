@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { test } from "node:test";
 import { OpenFgaClient } from "@openfga/sdk";
-import { bootstrapAdmin } from "./bootstrap.js";
+import { bootstrapAdmin, workloadSubject } from "./bootstrap.js";
+
+test("names a workload as the API does, by the hash of issuer and client ID", () => {
+  // The same vector is pinned in apps/api/src/admin/elevate.test.ts; change both together.
+  assert.equal(
+    workloadSubject("https://idp.example.test", "ops"),
+    "1159fd3801ad737455c6986ea070400eee708c5b23a8cd3d139dea84e56339d0",
+  );
+});
 
 test("refuses an admin subject that could name another OpenFGA user", async () => {
   // Rejected before any request, so the unreachable URL is never contacted.

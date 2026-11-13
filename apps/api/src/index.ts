@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { transformer } from "@openfga/syntax-transformer";
 import pg from "pg";
+import { createAdminAuthorizer } from "./admin/authorizer.js";
+import { withAdminScopes } from "./admin/elevate.js";
 import { explorerRoutes } from "./admin/explorerRoutes.js";
 import { modelRoutes } from "./admin/modelRoutes.js";
 import { createModelService } from "./admin/models.js";
@@ -13,6 +15,7 @@ import {
   authenticatorFromEnv,
   endUserVerifierFromEnv,
   oidcAuthFromEnv,
+  type Principal,
 } from "./auth/index.js";
 import { workloadRoutes } from "./auth/workloadRoutes.js";
 import { createBindingStore } from "./auth/workloads.js";
@@ -50,6 +53,18 @@ const { authenticate, verifyEndUser } =
         authenticate: authenticatorFromEnv(process.env),
         verifyEndUser: endUserVerifierFromEnv(process.env),
       };
+
+// Fixture principals carry their scopes; an oidc workload's admin scopes come from the riz-admin store.
+const withAdmin: (p: Principal) => Promise<Principal> =
+  process.env.RIZ_AUTH_MODE === "oidc"
+    ? withAdminScopes(
+        createAdminAuthorizer({
+          apiUrl: required("OPENFGA_API_URL"),
+          storeId: required("RIZ_ADMIN_STORE_ID"),
+          modelId: required("RIZ_ADMIN_MODEL_ID"),
+        }),
+      )
+    : async (p) => p;
 
 const migrator = await pool.connect();
 try {
@@ -120,14 +135,19 @@ createApp({
     openfgaUrl: required("OPENFGA_API_URL"),
     timeoutMs: readyTimeoutMs,
   }),
-  routes: async (req, res, principal, url) =>
-    (await adminHandler(req, res, principal, url)) ||
-    (await relationshipsHandler(req, res, principal, url)) ||
-    (await modelsHandler(req, res, principal, url)) ||
-    (await explorerHandler(req, res, principal, url)) ||
-    (await bindingsHandler(req, res, principal, url)) ||
-    (await providersHandler(req, res, principal, url)) ||
-    checks(req, res, principal, url),
+  routes: async (req, res, principal, url) => {
+    // Checks first and with the caller as authenticated: the check path never waits on the admin store.
+    if (await checks(req, res, principal, url)) return true;
+    const admin = await withAdmin(principal);
+    return (
+      (await adminHandler(req, res, admin, url)) ||
+      (await relationshipsHandler(req, res, admin, url)) ||
+      (await modelsHandler(req, res, admin, url)) ||
+      (await explorerHandler(req, res, admin, url)) ||
+      (await bindingsHandler(req, res, admin, url)) ||
+      (await providersHandler(req, res, admin, url))
+    );
+  },
 }).listen(port, "0.0.0.0", () => {
   console.log(JSON.stringify({ msg: "riz api listening", port }));
 });
